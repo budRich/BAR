@@ -29,13 +29,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            arch-install-scripts \
+            arch-install-scripts \   # provides pacman, pacman-key, repo-add, etc.
             git \
             parallel \
-            gnupg          # needed by pacman-key
+            gnupg                    # required by pacman-key
 
       # -------------------------------------------------
-      # 3️⃣ Set up a temporary Arch root **and install pacman first**
+      # 3️⃣ Create a temporary Arch root and install Arch packages
       # -------------------------------------------------
       - name: Set up temporary Arch root
         env:
@@ -44,28 +44,28 @@ jobs:
           mkdir -p "$ARCH_ROOT"
 
           # -----------------------------------------------------------------
-          # 3a – Install the *Arch* pacman package (contains pacman & pacman‑key)
+          # 3a – Initialise pacman database inside the temporary root
           # -----------------------------------------------------------------
           sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" pacman
 
           # -----------------------------------------------------------------
-          # 3b – Initialise the pacman keyring (now pacman-key exists)
+          # 3b – Initialise the pacman keyring (pacman-key now exists)
           # -----------------------------------------------------------------
           sudo pacman-key --init               # creates /etc/pacman.d/gnupg inside the root
           sudo pacman-key --populate archlinux
 
           # -----------------------------------------------------------------
-          # 3c – Install the Arch keyring package (provides the trusted keys)
+          # 3c – Install the Arch keyring package (trusted signing keys)
           # -----------------------------------------------------------------
           sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" archlinux-keyring
 
           # -----------------------------------------------------------------
-          # 3d – Install the full base-devel group into the temporary root
+          # 3d – Install the full base-devel group (build tools)
           # -----------------------------------------------------------------
           sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" base-devel
 
       # -------------------------------------------------
-      # 4️⃣ Build packages in parallel (using the temporary Arch root)
+      # 4️⃣ Build every PKGBUILD in parallel (using the temporary Arch root)
       # -------------------------------------------------
       - name: Build packages with parallel
         env:
@@ -77,19 +77,22 @@ jobs:
           # List each unique directory that contains a PKGBUILD
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
 
-          # Helper script that will be executed inside the Arch root
+          # Helper script that will be called for each package directory
           cat <<'EOF' > build_one.sh
           #!/usr/bin/env bash
           set -e
           PKGDIR="$1"
           REPO_TMP="/tmp/repo_tmp"
+          ARCH_ROOT="/tmp/archroot"
 
           echo "=== Building $PKGDIR ==="
           cd "$PKGDIR"
 
+          # (re)install base-devel inside the root – harmless if already present
+          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
+
           # Run makepkg inside the temporary Arch root
-          sudo pacman -r "$ARCH_ROOT" -S --noconfirm --needed base-devel
-          sudo pacman -r "$ARCH_ROOT" -C "$PKGDIR" -b "$PKGDIR" -c "$PKGDIR" \
+          sudo pacman --root "$ARCH_ROOT" -C "$PKGDIR" -b "$PKGDIR" -c "$PKGDIR" \
             -r "$ARCH_ROOT" \
             makepkg -sf --noconfirm
 
@@ -116,10 +119,10 @@ jobs:
         run: |
           cd "$REPO_DIR"
           repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
-          # repo-add also creates ${REPO_NAME}.files.tar.gz
+          # repo-add also creates ${REPO_NAME}.files.tar.gz automatically
 
       # -------------------------------------------------
-      # 6️⃣ Push the repo folder to the www branch
+      # 6️⃣ Push the repo folder to the www branch (GitHub Pages)
       # -------------------------------------------------
       - name: Push repo to www branch
         env:
@@ -128,8 +131,10 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
 
+          # Switch to (or create) the www branch that GitHub Pages serves
           git checkout www || git checkout -b www
 
+          # Replace the old repo folder with the freshly built one
           rm -rf repo
           mkdir -p repo
           cp -r "${{ runner.temp }}/repo/"* repo/
