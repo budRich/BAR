@@ -1,4 +1,4 @@
-name: Build Arch repo (Docker Arch root)
+name: Build Arch repo (Docker Arch root – debug)
 
 on:
   push:
@@ -13,15 +13,36 @@ jobs:
       contents: write
 
     steps:
+      # -------------------------------------------------
+      # 1️⃣ Checkout the repository
+      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: master
 
+      # -------------------------------------------------
+      # 2️⃣ Show what was actually checked out (host side)
+      # -------------------------------------------------
+      - name: List repository contents (host)
+        run: |
+          echo "=== Repository root ==="
+          pwd
+          echo "=== Files (up to depth 3) ==="
+          find . -maxdepth 3 -type f | sort
+          echo "=== PKGBUILD files ==="
+          find . -name PKGBUILD | sort
+
+      # -------------------------------------------------
+      # 3️⃣ Pull Arch Linux image
+      # -------------------------------------------------
       - name: Pull Arch Linux Docker image
         run: docker pull archlinux:latest
 
+      # -------------------------------------------------
+      # 4️⃣ Build PKGBUILDs inside Arch container (with extra debug)
+      # -------------------------------------------------
       - name: Build PKGBUILDs in Arch container
         env:
           REPO_DIR: ${{ runner.temp }}/repo
@@ -34,68 +55,67 @@ jobs:
             -w /src \
             archlinux:latest \
             bash -eux <<'EOS'
-          # -------------------------------------------------
-          # 1️⃣ Install required tools
-          # -------------------------------------------------
+          # ---- 1️⃣ Install tools -------------------------------------------------
           pacman -Sy --noconfirm base-devel git gnupg parallel fakeroot
-
-          # Refresh PATH (pacman may have added /usr/bin)
           source /etc/profile
 
-          # -------------------------------------------------
-          # 2️⃣ Initialise pacman keyring (required by makepkg)
-          # -------------------------------------------------
+          # ---- 2️⃣ Initialise keyring --------------------------------------------
           pacman-key --init
           pacman-key --populate archlinux
 
-          # -------------------------------------------------
-          # 3️⃣ Populate a minimal pacman package database
-          # -------------------------------------------------
-          pacman -Sy --noconfirm   # pulls core repos so makepkg can resolve deps
+          # ---- 3️⃣ Populate core pacman DB (needed for makepkg deps) -------------
+          pacman -Sy --noconfirm
 
-          # -------------------------------------------------
-          # 4️⃣ Locate all PKGBUILD directories
-          # -------------------------------------------------
+          # ---- 4️⃣ Debug: where are we? -----------------------------------------
+          echo "=== Container pwd ==="
+          pwd
+          echo "=== Files (depth ≤2) ==="
+          find . -maxdepth 2 -type f | sort
+
+          # ---- 5️⃣ Find PKGBUILD directories ------------------------------------
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
-          echo "PKGBUILD directories found:"
+          echo "=== PKGBUILD directories discovered ==="
           cat /tmp/pkgdirs.txt
+          if [ ! -s /tmp/pkgdirs.txt ]; then
+            echo "❌ No PKGBUILD files found – aborting."
+            exit 1
+          fi
 
-          # -------------------------------------------------
-          # 5️⃣ Helper that builds a single package
-          # -------------------------------------------------
+          # ---- 6️⃣ Helper to build a single package -----------------------------
           build_one() {
             local dir="$1"
             echo "=== Building $dir ==="
             cd "$dir"
-            # -s installs missing deps, -f forces overwrite, -c cleans up, -r removes after build
             makepkg -sf --noconfirm
             cp ./*.pkg.tar.* /repo/
           }
           export -f build_one
 
-          # -------------------------------------------------
-          # 6️⃣ Run builds in parallel – abort on first failure
-          # -------------------------------------------------
+          # ---- 7️⃣ Run builds in parallel – stop on first failure ---------------
           parallel --halt now,fail=1 --jobs "$(nproc)" build_one ::: $(cat /tmp/pkgdirs.txt)
 
-          # -------------------------------------------------
-          # 7️⃣ Debug: list what was copied to /repo
-          # -------------------------------------------------
-          echo "=== Files copied to /repo ==="
+          # ---- 8️⃣ Debug: what got copied ---------------------------------------
+          echo "=== Files now present in /repo ==="
           ls -l /repo
           EOS
 
+      # -------------------------------------------------
+      # 5️⃣ Verify that packages really exist
+      # -------------------------------------------------
       - name: Verify packages were built
         env:
           REPO_DIR: ${{ runner.temp }}/repo
         run: |
-          echo "Listing contents of $REPO_DIR"
+          echo "=== Final repo directory listing ==="
           ls -l "$REPO_DIR"
           if ! compgen -G "$REPO_DIR"/*.pkg.tar.* > /dev/null; then
             echo "❌ No packages were built – aborting."
             exit 1
           fi
 
+      # -------------------------------------------------
+      # 6️⃣ Generate repo metadata
+      # -------------------------------------------------
       - name: Generate repo database
         env:
           REPO_DIR: ${{ runner.temp }}/repo
@@ -104,6 +124,9 @@ jobs:
           cd "$REPO_DIR"
           repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
 
+      # -------------------------------------------------
+      # 7️⃣ Push to www branch
+      # -------------------------------------------------
       - name: Push repo to www branch
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
