@@ -61,24 +61,48 @@ jobs:
 
       - name: Setup GPG for signing
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
-          echo "allow-loopback-pinentry" >> ~/. gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
+          # Create GPG home directory with proper permissions
+          mkdir -p ~/. gnupg
+          chmod 700 ~/.gnupg
+          
+          # Configure GPG for non-interactive use
+          cat > ~/.gnupg/gpg. conf <<EOF
+          no-tty
+          batch
+          yes
+          pinentry-mode loopback
+          EOF
+          
+          cat > ~/.gnupg/gpg-agent.conf <<EOF
+          allow-loopback-pinentry
+          max-cache-ttl 7200
+          default-cache-ttl 7200
+          EOF
+          
+          # Kill any existing agent
+          gpgconf --kill gpg-agent || true
+          
+          # Import the private key
+          echo "${{ secrets. GPG_PRIVATE_KEY }}" | gpg --batch --import
+          
+          # Trust the key ultimately
+          echo -e "5\ny\n" | gpg --command-fd 0 --expert --edit-key 48E97CE0936581E3 trust quit || true
 
       - name: Generate repo metadata
         run: |
           mkdir -p /tmp/repo
-          cp /tmp/arch-packages/*.pkg.tar.* /tmp/repo/
+          cp /tmp/arch-packages/*. pkg.tar.* /tmp/repo/
           cd /tmp/repo
           
           # Sign each package
-          for pkg in *.pkg.tar.*; do
-            gpg --detach-sign --use-agent --no-armor --pinentry-mode loopback \
-              --passphrase "${{ secrets.GPG_PASSPHRASE }}" "$pkg"
+          for pkg in *. pkg.tar.*; do
+            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback --detach-sign --no-armor "$pkg"
           done
           
           # Create repo database with signing
-          repo-add --sign BAR.db.tar.gz *.pkg.tar.*
+          echo "${{ secrets.GPG_PASSPHRASE }}" | repo-add --sign --key 48E97CE0936581E3 \
+            --verify BAR.db.tar.gz *.pkg.tar.*
 
       - name: Push repo to www branch
         run: |
