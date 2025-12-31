@@ -38,6 +38,8 @@ jobs:
             # Create a build user (can't build as root)
             useradd -m builduser
             chown -R builduser:builduser . 
+
+            echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
             
             # Build the package
             sudo -u builduser makepkg -s --noconfirm
