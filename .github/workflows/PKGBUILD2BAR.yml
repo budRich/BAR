@@ -1,4 +1,4 @@
-name: Build Arch repo (Marketplace action)
+name: Build Arch repo
 
 on:
   push:
@@ -9,51 +9,71 @@ on:
 jobs:
   build-repo:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     permissions:
       contents: write
 
     steps:
+      - name: Setup Arch environment
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
 
-      - name: Build Arch packages
-        uses: FFY00/archlinux-pkgbuild-action@v1
-        with:
-          output-dir: ${{ runner.temp }}/arch-packages
+      - name:  Build packages
+        run: |
+          mkdir -p /tmp/arch-packages
+          
+          # Find all PKGBUILD files and build them
+          find . -name PKGBUILD -type f | while read pkgbuild; do
+            pkg_dir=$(dirname "$pkgbuild")
+            echo "Building package in $pkg_dir"
+            cd "$GITHUB_WORKSPACE/$pkg_dir"
+            
+            # Create a build user (can't build as root)
+            useradd -m builduser
+            chown -R builduser:builduser . 
+            
+            # Build the package
+            sudo -u builduser makepkg -s --noconfirm
+            
+            # Copy built packages
+            cp *.pkg.tar.* /tmp/arch-packages/ || true
+            
+            cd "$GITHUB_WORKSPACE"
+          done
 
       - name: List built packages
         run: |
           echo "=== Packages built ==="
-          ls -l "${{ runner.temp }}/arch-packages"
-          if [ ! -e "${{ runner.temp }}/arch-packages"/*.pkg.tar.* ]; then
+          ls -lh /tmp/arch-packages
+          if [ !  -e /tmp/arch-packages/*. pkg.tar.* ]; then
             echo "❌ No packages were built – aborting."
             exit 1
           fi
 
       - name: Generate repo metadata
-        env:
-          REPO_DIR: ${{ runner.temp }}/repo
-          REPO_NAME: BAR
         run: |
-          mkdir -p "$REPO_DIR"
-          cp "${{ runner.temp }}/arch-packages"/*.pkg.tar.* "$REPO_DIR"/
-          cd "$REPO_DIR"
-          repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
+          mkdir -p /tmp/repo
+          cp /tmp/arch-packages/*.pkg. tar.* /tmp/repo/
+          cd /tmp/repo
+          repo-add BAR.db.tar.gz *.pkg.tar.*
 
       - name: Push repo to www branch
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
-          git fetch origin www || true
-          git checkout -B www
+          git fetch origin www || git checkout --orphan www
+          git checkout www || git checkout --orphan www
           rm -rf repo
           mkdir -p repo
-          cp -r "${{ runner.temp }}/repo/"* repo/
+          cp -r /tmp/repo/* repo/
           git add repo
           git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
           git push origin www
