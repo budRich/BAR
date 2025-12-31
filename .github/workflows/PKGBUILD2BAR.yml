@@ -42,7 +42,7 @@ jobs:
             echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
             
             # Build the package
-            sudo -u builduser makepkg -s --noconfirm
+            sudo -u builduser makepkg -s --nodeps --noconfirm
             
             # Copy built packages
             cp *.pkg.tar.* /tmp/arch-packages/ || true
@@ -54,7 +54,7 @@ jobs:
         run: |
           echo "=== Packages built ==="
           ls -lh /tmp/arch-packages
-          if [ !  -e /tmp/arch-packages/*. pkg.tar.* ]; then
+          if [ !  -e /tmp/arch-packages/*.pkg.tar.* ]; then
             echo "❌ No packages were built – aborting."
             exit 1
           fi
@@ -62,7 +62,7 @@ jobs:
       - name: Generate repo metadata
         run: |
           mkdir -p /tmp/repo
-          cp /tmp/arch-packages/*.pkg. tar.* /tmp/repo/
+          cp /tmp/arch-packages/*.pkg.tar.* /tmp/repo/
           cd /tmp/repo
           repo-add BAR.db.tar.gz *.pkg.tar.*
 
