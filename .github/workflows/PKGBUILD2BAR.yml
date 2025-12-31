@@ -115,7 +115,7 @@ jobs:
             # ---- 8️⃣ Debug: what got copied ---------------------------------------
             echo "=== Files now present in /repo ==="
             ls -l /repo
-EOS
+          EOS
 
       # -------------------------------------------------
       # 5️⃣ Verify that packages really exist
