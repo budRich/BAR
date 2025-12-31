@@ -1,5 +1,5 @@
 # Maintainer: budRich af budlabs
-# Cuntributor: budRich af budlabs
+# Contributor: budRich af budlabs
 
 pkgname=i3ass
 pkgver=2025.12.27.1
@@ -12,7 +12,7 @@ depends=('bash>=4.0.0' 'i3-wm' 'gawk' 'sed')
 makedepends=('gawk' 'sed')
 optdepends=('xdotool' 'i3menu')
 source=("$url/archive/$pkgver/${pkgname}-$pkgver.tar.gz")
-sha256sums=('dbe96cff4c2820e1d860982945aa71c2f4f09c0d3bd98c20fe74908d7c8b82c5')
+sha256sums=('852eb901cd8b331cf3ec02ea4da853d41ea2db637f0078ed99ef8a807e9d6016')
 _trgdir="$pkgname-$pkgver"
 
 # _trgdir="$pkgname"
