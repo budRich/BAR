@@ -1,1 +1,0 @@
-BAR.db.tar.gz.sig
