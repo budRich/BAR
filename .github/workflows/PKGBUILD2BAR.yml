@@ -81,33 +81,27 @@ jobs:
             exit 1
           fi
           echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
-          # ---- 6️⃣ Helper to build a single package -----------------------------
-
-          build_one() {
-            local dir="$1"
+          # ---- 7️⃣ Build packages one by one with full output ---------------
+          while IFS= read -r dir; do
             echo "=== Building $dir ==="
-            cd "$dir"
-            makepkg -sf --noconfirm || { echo "❌ makepkg failed in $dir"; return 1; }
+            cd "/src/$dir" || { echo "❌ Failed to cd into $dir"; exit 1; }
             
-            # Verify packages were created before copying
-            local pkg_count=$(ls -1 ./*.pkg.tar.* 2>/dev/null | wc -l)
-            if [ "$pkg_count" -eq 0 ]; then
-              echo "❌ No package files created in $dir"
-              return 1
-            fi
+            echo "--- Running makepkg in $dir ---"
+            makepkg -sf --noconfirm || { echo "❌ makepkg failed in $dir"; exit 1; }
             
-            cp ./*.pkg.tar.* /repo/ || { echo "❌ Failed to copy packages from $dir"; return 1; }
+            echo "--- Checking for built packages ---"
+            ls -la . /*.pkg.tar.* 2>&1 || { echo "❌ No package files created in $dir"; exit 1; }
+            
+            echo "--- Copying packages to /repo ---"
+            cp ./*.pkg.tar.* /repo/ || { echo "❌ Failed to copy packages from $dir"; exit 1; }
+            
             echo "✅ Successfully built and copied packages from $dir"
-          }
-          export -f build_one
-
-          # ---- 7️⃣ Run builds in parallel – stop on first failure ---------------
-          parallel --halt now,fail=1 --jobs "$(nproc)" --line-buffer build_one ::: $(cat /tmp/pkgdirs.txt)
+            echo ""
+          done < /tmp/pkgdirs.txt
 
           # ---- 8️⃣ Debug: what got copied ---------------------------------------
           echo "=== Files now present in /repo ==="
           ls -l /repo
-          EOS
 
       # -------------------------------------------------
       # 5️⃣ Verify that packages really exist
