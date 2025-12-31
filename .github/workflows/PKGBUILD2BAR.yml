@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-repo:
-    runs-on: ubuntu-latest          # host OS
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
@@ -43,29 +43,29 @@ jobs:
             -w /src \
             archlinux:latest \
             bash -eux <<'EOS'
-            # Install required build tools
-            pacman -Sy --noconfirm base-devel git gnupg
+          # ---- install build tools -------------------------------------------------
+          pacman -Sy --noconfirm base-devel git gnupg parallel
 
-            # Initialise keyring (needed for makepkg)
-            pacman-key --init
-            pacman-key --populate archlinux
+          # ---- initialise keyring --------------------------------------------------
+          pacman-key --init
+          pacman-key --populate archlinux
 
-            # Find every directory containing a PKGBUILD
-            find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
+          # ---- locate PKGBUILD directories -----------------------------------------
+          find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
 
-            # Helper to build a single package
-            build_one() {
-              local dir="$1"
-              echo "=== Building $dir ==="
-              cd "$dir"
-              makepkg -sf --noconfirm
-              cp ./*.pkg.tar.* /repo/
-            }
-            export -f build_one
+          # ---- helper that builds a single package ---------------------------------
+          build_one() {
+            local dir="$1"
+            echo "=== Building $dir ==="
+            cd "$dir"
+            makepkg -sf --noconfirm
+            cp ./*.pkg.tar.* /repo/
+          }
+          export -f build_one
 
-            # Build in parallel (uses all CPU cores)
-            parallel --jobs "$(nproc)" build_one ::: $(cat /tmp/pkgdirs.txt)
-            EOS
+          # ---- run builds in parallel -----------------------------------------------
+          parallel --jobs "$(nproc)" build_one ::: $(cat /tmp/pkgdirs.txt)
+          EOS
 
       # -------------------------------------------------
       # 4️⃣ Create repo metadata (db & files)
