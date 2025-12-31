@@ -55,8 +55,9 @@ jobs:
             -w /src \
             archlinux:latest \
             bash -eux <<'EOS'
-          # ---- 1️⃣ Install tools -------------------------------------------------
-          pacman -Sy --noconfirm base-devel git gnupg parallel fakeroot
+          # ---- 1️⃣ Install tools + sync database -------------------------------------------------
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git gnupg parallel fakeroot gawk sed
           source /etc/profile
 
           # ---- 2️⃣ Initialise keyring --------------------------------------------
