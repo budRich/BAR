@@ -19,125 +19,78 @@ jobs:
           fetch-depth: 0
           ref: master
 
-      # ---- enable repos and install tools ----
-      - name: Enable Ubuntu repositories
+      - name: Install Ubuntu utilities
         run: |
           sudo add-apt-repository -y universe
           sudo apt-get update
-
-      - name: Install host utilities
-        run: |
           sudo apt-get install -y \
             arch-install-scripts \
+            pacman \
             git \
             parallel \
             gnupg
 
-      # -------------------------------------------------
-      # 3️⃣ Create a temporary Arch root and install Arch packages
-      # -------------------------------------------------
       - name: Set up temporary Arch root
         env:
           ARCH_ROOT: /tmp/archroot
         run: |
-          mkdir -p "$ARCH_ROOT"
+          sudo mkdir -p "$ARCH_ROOT"
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" pacman
+          sudo pacman-key --init --root "$ARCH_ROOT"
+          sudo pacman-key --populate archlinux --root "$ARCH_ROOT"
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" archlinux-keyring base-devel
 
-          # -----------------------------------------------------------------
-          # 3a – Initialise pacman database inside the temporary root
-          # -----------------------------------------------------------------
-          pacman -Sy --noconfirm --root "$ARCH_ROOT" pacman
-
-          # -----------------------------------------------------------------
-          # 3b – Initialise the pacman keyring (pacman-key now exists)
-          # -----------------------------------------------------------------
-          pacman-key --init               # creates /etc/pacman.d/gnupg inside the root
-          pacman-key --populate archlinux
-
-          # -----------------------------------------------------------------
-          # 3c – Install the Arch keyring package (trusted signing keys)
-          # -----------------------------------------------------------------
-          pacman -Sy --noconfirm --root "$ARCH_ROOT" archlinux-keyring
-
-          # -----------------------------------------------------------------
-          # 3d – Install the full base-devel group (build tools)
-          # -----------------------------------------------------------------
-          pacman -Sy --noconfirm --root "$ARCH_ROOT" base-devel
-
-      # -------------------------------------------------
-      # 4️⃣ Build every PKGBUILD in parallel (using the temporary Arch root)
-      # -------------------------------------------------
-      - name: Build packages with parallel
+      - name: Build packages in parallel
         env:
           REPO_DIR: ${{ runner.temp }}/repo
           ARCH_ROOT: /tmp/archroot
         run: |
-          mkdir -p "$REPO_DIR"
-
-          # List each unique directory that contains a PKGBUILD
+          mkdir -p "$REPO_DIR" /tmp/repo_tmp
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
 
-          # Helper script that will be called for each package directory
           cat <<'EOF' > build_one.sh
           #!/usr/bin/env bash
           set -e
           PKGDIR="$1"
-          REPO_TMP="/tmp/repo_tmp"
           ARCH_ROOT="/tmp/archroot"
+          REPO_TMP="/tmp/repo_tmp"
 
           echo "=== Building $PKGDIR ==="
           cd "$PKGDIR"
-
-          # (re)install base-devel inside the root – harmless if already present
-          pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
-
-          # Run makepkg inside the temporary Arch root
-          pacman --root "$ARCH_ROOT" -C "$PKGDIR" -b "$PKGDIR" -c "$PKGDIR" \
-            -r "$ARCH_ROOT" \
+          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
+          sudo pacman --root "$ARCH_ROOT" -C "$PKGDIR" -b "$PKGDIR" -c "$PKGDIR" -r "$ARCH_ROOT" \
             makepkg -sf --noconfirm
-
           cp ./*.pkg.tar.* "$REPO_TMP"/
           EOF
           chmod +x build_one.sh
 
-          mkdir -p /tmp/repo_tmp
-
-          # Run GNU parallel – one job per CPU core
-          parallel --jobs "$(nproc)" \
-            ./build_one.sh {} :::: pkgdirs.txt
-
-          # Collect the built packages
+          parallel --jobs "$(nproc)" ./build_one.sh {} :::: pkgdirs.txt
           cp /tmp/repo_tmp/*.pkg.tar.* "$REPO_DIR"/
 
-      # -------------------------------------------------
-      # 5️⃣ Generate repo metadata (db & files)
-      # -------------------------------------------------
       - name: Create repo database
         env:
           REPO_DIR: ${{ runner.temp }}/repo
           REPO_NAME: BAR
         run: |
           cd "$REPO_DIR"
-          repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
-          # repo-add also creates ${REPO_NAME}.files.tar.gz automatically
+          if compgen -G "*.pkg.tar.*" > /dev/null; then
+            repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
+          else
+            echo "No packages built – aborting."
+            exit 1
+          fi
 
-      # -------------------------------------------------
-      # 6️⃣ Push the repo folder to the www branch (GitHub Pages)
-      # -------------------------------------------------
       - name: Push repo to www branch
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
-
-          # Switch to (or create) the www branch that GitHub Pages serves
-          git checkout www || git checkout -b www
-
-          # Replace the old repo folder with the freshly built one
+          git fetch origin www || true
+          git checkout -B www
           rm -rf repo
           mkdir -p repo
           cp -r "${{ runner.temp }}/repo/"* repo/
-
           git add repo
           git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
           git push origin www
