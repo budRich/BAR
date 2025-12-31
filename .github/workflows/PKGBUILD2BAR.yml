@@ -1,4 +1,4 @@
-name: Build Arch repo (Docker Arch root – debug)
+name: Build Arch repo (Marketplace action)
 
 on:
   push:
@@ -10,140 +10,59 @@ jobs:
   build-repo:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write   # needed for the final push to the www branch
 
     steps:
       # -------------------------------------------------
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout the repository (including submodules if any)
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: master
+          submodules: true
 
       # -------------------------------------------------
-      # 2️⃣ Show what was actually checked out (host side)
+      # 2️⃣ Build every PKGBUILD with the Marketplace action
       # -------------------------------------------------
-      - name: List repository contents (host)
+      - name: Build Arch packages
+        uses: devops-infra/action-arch-pkgbuild@v1
+        with:
+          # The action automatically:
+          #   • installs pacman, base-devel, gnupg, fakeroot
+          #   • runs pacman-key --init && pacman-key --populate archlinux
+          #   • runs makepkg -sf --noconfirm for each PKGBUILD it finds
+          #   • copies the resulting *.pkg.tar.* files to ${{ runner.temp }}/arch-packages
+          output-dir: ${{ runner.temp }}/arch-packages   # <‑‑ where the .pkg files will be placed
+          extra-packages: sed gawk   # space‑separated list
+
+      # -------------------------------------------------
+      # 3️⃣ Verify that packages were produced (optional but helpful)
+      # -------------------------------------------------
+      - name: List built packages
         run: |
-          echo "=== Repository root ==="
-          pwd
-          echo "=== Files (up to depth 3) ==="
-          find . -maxdepth 3 -type f | sort
-          echo "=== PKGBUILD files ==="
-          find . -name PKGBUILD | sort
-
-      # -------------------------------------------------
-      # 3️⃣ Pull Arch Linux image
-      # -------------------------------------------------
-      - name: Pull Arch Linux Docker image
-        run: docker pull archlinux:latest
-
-      # -------------------------------------------------
-      # 4️⃣ Build PKGBUILDs inside Arch container (with extra debug)
-      # -------------------------------------------------
-      - name: Build PKGBUILDs in Arch container
-        env:
-          REPO_DIR: ${{ runner.temp }}/repo
-        run: |
-          mkdir -p "$REPO_DIR"
-
-          docker run --rm \
-            -v "${{ github.workspace }}:/src" \
-            -v "${REPO_DIR}:/repo" \
-            -w /src \
-            archlinux:latest \
-            bash -eux <<'EOS'
-            # ---- 1️⃣ Install tools + sync database -------------------------------------------------
-            pacman -Syu --noconfirm
-            pacman -S --noconfirm base-devel git gnupg parallel fakeroot gawk sed sudo
-            source /etc/profile
-
-            # ---- 2️⃣ Initialise keyring --------------------------------------------
-            pacman-key --init
-            pacman-key --populate archlinux
-
-            # ---- 3️⃣ Populate core pacman DB (needed for makepkg deps) -------------
-            pacman -Sy --noconfirm
-
-            # ---- NEW: Create build user with sudo privileges ----------------------
-            useradd -m -G wheel builduser
-            echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-            chown -R builduser:builduser /src /repo
-
-            # ---- 4️⃣ Debug: where are we?  -----------------------------------------
-            echo "=== Container pwd ==="
-            pwd
-            echo "=== Files (depth ≤2) ==="
-            find . -maxdepth 2 -type f | sort
-
-            # ---- 5️⃣ Find PKGBUILD directories ------------------------------------
-            find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
-            echo "=== PKGBUILD directories discovered ==="
-            cat /tmp/pkgdirs.txt
-            if [ ! -s /tmp/pkgdirs.txt ]; then
-              echo "❌ No PKGBUILD files found – aborting."
-              exit 1
-            fi
-            echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
-
-            # ---- 7️⃣ Build packages one by one with full output ---------------
-            echo "=== About to start building packages ==="
-            while IFS= read -r dir; do
-              echo "=== Building $dir ==="
-              echo "=== DEBUG: dir variable = '$dir' ==="
-              cd "/src/$dir" || { echo "❌ Failed to cd into $dir"; exit 1; }
-              echo "=== DEBUG: pwd after cd = $(pwd) ==="
-              echo "=== DEBUG: ls of current directory ==="
-              ls -la
-              
-              echo "--- Running makepkg in $dir ---"
-              su - builduser -c "cd '/src/$dir' && makepkg -sf --noconfirm" || { echo "❌ makepkg failed in $dir"; exit 1; }
-              
-              echo "--- Checking for built packages ---"
-              ls -la /src/$dir/*.pkg.tar.* 2>&1 || { echo "❌ No package files created in $dir"; exit 1; }
-              
-              echo "--- Copying packages to /repo ---"
-              cp /src/$dir/*.pkg.tar. * /repo/ || { echo "❌ Failed to copy packages from $dir"; exit 1; }
-              
-              echo "✅ Successfully built and copied packages from $dir"
-              echo ""
-            done < /tmp/pkgdirs.txt
-            echo "=== Finished building all packages ==="
-
-            # ---- 8️⃣ Debug: what got copied ---------------------------------------
-            echo "=== Files now present in /repo ==="
-            ls -l /repo
-          EOS
-
-      # -------------------------------------------------
-      # 5️⃣ Verify that packages really exist
-      # -------------------------------------------------
-      - name: Verify packages were built
-        env:
-          REPO_DIR: ${{ runner.temp }}/repo
-        run: |
-          echo "=== Final repo directory listing ==="
-          ls -l "$REPO_DIR"
-          if ! compgen -G "$REPO_DIR"/*.pkg.tar.* > /dev/null; then
+          echo "=== Packages built ==="
+          ls -l "${{ runner.temp }}/arch-packages"
+          if [ ! -e "${{ runner.temp }}/arch-packages"/*.pkg.tar.* ]; then
             echo "❌ No packages were built – aborting."
             exit 1
           fi
 
       # -------------------------------------------------
-      # 6️⃣ Generate repo metadata
+      # 4️⃣ Create the Arch repo database
       # -------------------------------------------------
-      - name: Generate repo database
+      - name: Generate repo metadata
         env:
           REPO_DIR: ${{ runner.temp }}/repo
           REPO_NAME: BAR
         run: |
+          mkdir -p "$REPO_DIR"
+          cp "${{ runner.temp }}/arch-packages"/*.pkg.tar.* "$REPO_DIR"/
           cd "$REPO_DIR"
           repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
 
       # -------------------------------------------------
-      # 7️⃣ Push to www branch
+      # 5️⃣ Push the repo to the www (GitHub Pages) branch
       # -------------------------------------------------
       - name: Push repo to www branch
         env:
