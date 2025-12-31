@@ -55,54 +55,61 @@ jobs:
             -w /src \
             archlinux:latest \
             bash -eux <<'EOS'
-          # ---- 1️⃣ Install tools + sync database -------------------------------------------------
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git gnupg parallel fakeroot gawk sed
-          source /etc/profile
+            # ---- 1️⃣ Install tools + sync database -------------------------------------------------
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm base-devel git gnupg parallel fakeroot gawk sed sudo
+            source /etc/profile
 
-          # ---- 2️⃣ Initialise keyring --------------------------------------------
-          pacman-key --init
-          pacman-key --populate archlinux
+            # ---- 2️⃣ Initialise keyring --------------------------------------------
+            pacman-key --init
+            pacman-key --populate archlinux
 
-          # ---- 3️⃣ Populate core pacman DB (needed for makepkg deps) -------------
-          pacman -Sy --noconfirm
+            # ---- 3️⃣ Populate core pacman DB (needed for makepkg deps) -------------
+            pacman -Sy --noconfirm
 
-          # ---- 4️⃣ Debug: where are we? -----------------------------------------
-          echo "=== Container pwd ==="
-          pwd
-          echo "=== Files (depth ≤2) ==="
-          find . -maxdepth 2 -type f | sort
+            # ---- NEW: Create build user with sudo privileges ----------------------
+            useradd -m -G wheel builduser
+            echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+            chown -R builduser:builduser /src /repo
 
-          # ---- 5️⃣ Find PKGBUILD directories ------------------------------------
-          find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
-          echo "=== PKGBUILD directories discovered ==="
-          cat /tmp/pkgdirs.txt
-          if [ ! -s /tmp/pkgdirs.txt ]; then
-            echo "❌ No PKGBUILD files found – aborting."
-            exit 1
-          fi
-          echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
-          # ---- 7️⃣ Build packages one by one with full output ---------------
-          while IFS= read -r dir; do
-            echo "=== Building $dir ==="
-            cd "/src/$dir" || { echo "❌ Failed to cd into $dir"; exit 1; }
-            
-            echo "--- Running makepkg in $dir ---"
-            makepkg -sf --noconfirm || { echo "❌ makepkg failed in $dir"; exit 1; }
-            
-            echo "--- Checking for built packages ---"
-            ls -la . /*.pkg.tar.* 2>&1 || { echo "❌ No package files created in $dir"; exit 1; }
-            
-            echo "--- Copying packages to /repo ---"
-            cp ./*.pkg.tar.* /repo/ || { echo "❌ Failed to copy packages from $dir"; exit 1; }
-            
-            echo "✅ Successfully built and copied packages from $dir"
-            echo ""
-          done < /tmp/pkgdirs. txt
+            # ---- 4️⃣ Debug: where are we?  -----------------------------------------
+            echo "=== Container pwd ==="
+            pwd
+            echo "=== Files (depth ≤2) ==="
+            find . -maxdepth 2 -type f | sort
 
-          # ---- 8️⃣ Debug: what got copied ---------------------------------------
-          echo "=== Files now present in /repo ==="
-          ls -l /repo
+            # ---- 5️⃣ Find PKGBUILD directories ------------------------------------
+            find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
+            echo "=== PKGBUILD directories discovered ==="
+            cat /tmp/pkgdirs.txt
+            if [ ! -s /tmp/pkgdirs.txt ]; then
+              echo "❌ No PKGBUILD files found – aborting."
+              exit 1
+            fi
+            echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
+
+            # ---- 7️⃣ Build packages one by one with full output ---------------
+            while IFS= read -r dir; do
+              echo "=== Building $dir ==="
+              cd "/src/$dir" || { echo "❌ Failed to cd into $dir"; exit 1; }
+              
+              echo "--- Running makepkg in $dir ---"
+              su - builduser -c "cd '/src/$dir' && makepkg -sf --noconfirm" || { echo "❌ makepkg failed in $dir"; exit 1; }
+              
+              echo "--- Checking for built packages ---"
+              ls -la /src/$dir/*.pkg.tar.* 2>&1 || { echo "❌ No package files created in $dir"; exit 1; }
+              
+              echo "--- Copying packages to /repo ---"
+              cp /src/$dir/*.pkg.tar. * /repo/ || { echo "❌ Failed to copy packages from $dir"; exit 1; }
+              
+              echo "✅ Successfully built and copied packages from $dir"
+              echo ""
+            done < /tmp/pkgdirs.txt
+
+            # ---- 8️⃣ Debug: what got copied ---------------------------------------
+            echo "=== Files now present in /repo ==="
+            ls -l /repo
+            EOS
 
       # -------------------------------------------------
       # 5️⃣ Verify that packages really exist
