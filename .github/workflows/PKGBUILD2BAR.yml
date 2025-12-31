@@ -1,4 +1,4 @@
-name: Build Arch repo (Ubuntu runner + Arch root)
+name: Build Arch repo (Ubuntu runner + temporary Arch root)
 
 on:
   push:
@@ -23,39 +23,38 @@ jobs:
           ref: master
 
       # -------------------------------------------------
-      # 2️⃣ Install host‑side tools (arch‑install‑scripts, git, parallel)
+      # 2️⃣ Install host‑side utilities (arch‑install‑scripts, git, parallel, gnupg)
       # -------------------------------------------------
-      - name: Install host tools
+      - name: Install host utilities
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             arch-install-scripts \
             git \
-            parallel
+            parallel \
+            gnupg          # needed by pacman-key
 
       # -------------------------------------------------
-      # 3️⃣ Create a temporary Arch root and install base-devel
+      # 3️⃣ Create a temporary Arch root and install the real pacman + base-devel
       # -------------------------------------------------
       - name: Set up temporary Arch root
         env:
           ARCH_ROOT: /tmp/archroot
         run: |
           mkdir -p "$ARCH_ROOT"
-          # Initialise pacman keyring (required for any pacman operation)
-          sudo pacman-key --init
-          sudo pacman-key --populate archlinux
 
-          # Initialise pacman database inside the temporary root
-          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" \
-            pacman \
-            archlinux-keyring
+          # Initialise a minimal pacman database inside the root
+          sudo pacman-key --init               # creates the keyring directory (empty)
+          sudo pacman-key --populate archlinux # populate with Arch keyring
+
+          # Install the *Arch* pacman package (contains pacman & pacman-key)
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" pacman
+
+          # Now we can use pacman‑key inside the root
+          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm archlinux-keyring
 
           # Install the full base-devel group into the temporary root
-          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" \
-            base-devel
-
-          # Verify that makepkg is now available inside the root
-          sudo pacman -Ql --root "$ARCH_ROOT" makepkg | head
+          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
 
       # -------------------------------------------------
       # 4️⃣ Build packages in parallel (using the temporary Arch root)
