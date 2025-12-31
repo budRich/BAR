@@ -80,19 +80,29 @@ jobs:
             echo "❌ No PKGBUILD files found – aborting."
             exit 1
           fi
-
+          echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
           # ---- 6️⃣ Helper to build a single package -----------------------------
+
           build_one() {
             local dir="$1"
             echo "=== Building $dir ==="
             cd "$dir"
-            makepkg -sf --noconfirm
-            cp ./*.pkg.tar.* /repo/
+            makepkg -sf --noconfirm || { echo "❌ makepkg failed in $dir"; return 1; }
+            
+            # Verify packages were created before copying
+            local pkg_count=$(ls -1 ./*.pkg.tar.* 2>/dev/null | wc -l)
+            if [ "$pkg_count" -eq 0 ]; then
+              echo "❌ No package files created in $dir"
+              return 1
+            fi
+            
+            cp ./*.pkg.tar.* /repo/ || { echo "❌ Failed to copy packages from $dir"; return 1; }
+            echo "✅ Successfully built and copied packages from $dir"
           }
           export -f build_one
 
           # ---- 7️⃣ Run builds in parallel – stop on first failure ---------------
-          parallel --halt now,fail=1 --jobs "$(nproc)" build_one ::: $(cat /tmp/pkgdirs.txt)
+          parallel --halt now,fail=1 --jobs "$(nproc)" --line-buffer build_one ::: $(cat /tmp/pkgdirs.txt)
 
           # ---- 8️⃣ Debug: what got copied ---------------------------------------
           echo "=== Files now present in /repo ==="
