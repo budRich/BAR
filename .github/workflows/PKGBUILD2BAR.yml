@@ -1,52 +1,76 @@
-name: Build Arch repo
+name: Build Arch repo (Ubuntu runner + Arch root)
 
 on:
   push:
     branches: [master]
     paths:
-      - '**/PKGBUILD'   # trigger only when a PKGBUILD changes
+      - '**/PKGBUILD'
 
 jobs:
   build-repo:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to push to www branch
+      contents: write               # needed to push to the www branch
 
     steps:
       # -------------------------------------------------
-      # 1️⃣ Checkout the repository (both branches)
+      # 1️⃣ Checkout repository (both branches)
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # fetch all history so we can push
+          fetch-depth: 0
           ref: master
 
       # -------------------------------------------------
-      # 2️⃣ Install Arch tools (arch‑install‑scripts, base-devel, git, parallel)
+      # 2️⃣ Install host‑side tools (arch‑install‑scripts, git, parallel)
       # -------------------------------------------------
-      - name: Install Arch toolchain
+      - name: Install host tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             arch-install-scripts \
-            base-devel \
             git \
             parallel
 
       # -------------------------------------------------
-      # 3️⃣ Build every package – parallel version
+      # 3️⃣ Create a temporary Arch root and install base-devel
+      # -------------------------------------------------
+      - name: Set up temporary Arch root
+        env:
+          ARCH_ROOT: /tmp/archroot
+        run: |
+          mkdir -p "$ARCH_ROOT"
+          # Initialise pacman keyring (required for any pacman operation)
+          sudo pacman-key --init
+          sudo pacman-key --populate archlinux
+
+          # Initialise pacman database inside the temporary root
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" \
+            pacman \
+            archlinux-keyring
+
+          # Install the full base-devel group into the temporary root
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" \
+            base-devel
+
+          # Verify that makepkg is now available inside the root
+          sudo pacman -Ql --root "$ARCH_ROOT" makepkg | head
+
+      # -------------------------------------------------
+      # 4️⃣ Build packages in parallel (using the temporary Arch root)
       # -------------------------------------------------
       - name: Build packages with parallel
         env:
           REPO_DIR: ${{ runner.temp }}/repo
+          ARCH_ROOT: /tmp/archroot
         run: |
           mkdir -p "$REPO_DIR"
 
-          # 1️⃣ List each unique directory that contains a PKGBUILD
+          # List each unique directory that contains a PKGBUILD
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
 
-          # 2️⃣ Helper script that will be called by parallel
+          # Helper script that will be executed inside the Arch root
           cat <<'EOF' > build_one.sh
           #!/usr/bin/env bash
           set -e
@@ -55,60 +79,54 @@ jobs:
 
           echo "=== Building $PKGDIR ==="
           cd "$PKGDIR"
-          # -sf : force rebuild, ignore existing .pkg files
-          # --noconfirm : no interactive prompts
-          makepkg -sf --noconfirm
+
+          # Run makepkg inside the temporary Arch root
+          sudo pacman -r "$ARCH_ROOT" -S --noconfirm --needed base-devel
+          sudo pacman -r "$ARCH_ROOT" -C "$PKGDIR" -b "$PKGDIR" -c "$PKGDIR" \
+            -r "$ARCH_ROOT" \
+            makepkg -sf --noconfirm
+
           cp ./*.pkg.tar.* "$REPO_TMP"/
           EOF
           chmod +x build_one.sh
 
-          # 3️⃣ Create a temporary folder that parallel can write into
           mkdir -p /tmp/repo_tmp
 
-          # 4️⃣ Run GNU parallel – one job per CPU core
+          # Run GNU parallel – one job per CPU core
           parallel --jobs "$(nproc)" \
             ./build_one.sh {} :::: pkgdirs.txt
 
-          # 5️⃣ Copy the built packages back to the runner’s temp folder
+          # Collect the built packages
           cp /tmp/repo_tmp/*.pkg.tar.* "$REPO_DIR"/
 
-
       # -------------------------------------------------
-      # 4️⃣ Create repo database files
+      # 5️⃣ Generate repo metadata (db & files)
       # -------------------------------------------------
-      - name: Generate repo metadata
+      - name: Create repo database
         env:
           REPO_DIR: ${{ runner.temp }}/repo
           REPO_NAME: BAR
         run: |
-          sudo chroot /tmp/archroot /bin/bash -c "
-            cd /workdir && \
-            repo-add ${REPO_NAME}.db.tar.gz ${REPO_DIR}/*.pkg.tar.*
-          "
-          # Move the db files into the repo directory
-          sudo cp "${REPO_DIR}/${REPO_NAME}.db.tar.gz" "$REPO_DIR/"
-          sudo cp "${REPO_DIR}/${REPO_NAME}.files.tar.gz" "$REPO_DIR/"
+          cd "$REPO_DIR"
+          repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
+          # repo-add also creates ${REPO_NAME}.files.tar.gz
 
       # -------------------------------------------------
-      # 5️⃣ Commit & push to the www branch
+      # 6️⃣ Push the repo folder to the www branch
       # -------------------------------------------------
       - name: Push repo to www branch
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_NAME: BAR
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
 
-          # Switch to (or create) the www branch
           git checkout www || git checkout -b www
 
-          # Clean old repo folder and copy the new one
           rm -rf repo
           mkdir -p repo
           cp -r "${{ runner.temp }}/repo/"* repo/
 
-          # Add, commit, and push
           git add repo
-          git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes to commit"
+          git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
           git push origin www
