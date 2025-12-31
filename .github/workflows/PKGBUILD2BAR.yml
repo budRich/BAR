@@ -97,7 +97,7 @@ jobs:
             
             echo "✅ Successfully built and copied packages from $dir"
             echo ""
-          done < /tmp/pkgdirs.txt
+          done < /tmp/pkgdirs. txt
 
           # ---- 8️⃣ Debug: what got copied ---------------------------------------
           echo "=== Files now present in /repo ==="
