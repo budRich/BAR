@@ -10,21 +10,16 @@ jobs:
   build-repo:
     runs-on: ubuntu-latest
     permissions:
-      contents: write               # needed to push to the www branch
+      contents: write
 
     steps:
-      # -------------------------------------------------
-      # 1️⃣ Checkout repository (both branches)
-      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: master
 
-      # -------------------------------------------------
-      # 2️⃣ Enable Ubuntu repos & install host utilities
-      # -------------------------------------------------
+      # ---- enable repos and install tools ----
       - name: Enable Ubuntu repositories
         run: |
           sudo add-apt-repository -y universe
@@ -33,13 +28,13 @@ jobs:
       - name: Install host utilities
         run: |
           sudo apt-get install -y \
-            arch-install-scripts \   # provides pacman, pacman-key, repo-add
+            arch-install-scripts \
             git \
             parallel \
-            gnupg                    # required by pacman-key
+            gnupg
 
       # -------------------------------------------------
-      # 3️⃣ Set up a temporary Arch root and install Arch packages
+      # 3️⃣ Create a temporary Arch root and install Arch packages
       # -------------------------------------------------
       - name: Set up temporary Arch root
         env:
@@ -81,7 +76,7 @@ jobs:
           # List each unique directory that contains a PKGBUILD
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
 
-          # Helper script executed for each package directory
+          # Helper script that will be called for each package directory
           cat <<'EOF' > build_one.sh
           #!/usr/bin/env bash
           set -e
@@ -92,7 +87,7 @@ jobs:
           echo "=== Building $PKGDIR ==="
           cd "$PKGDIR"
 
-          # Ensure base-devel is present (no‑op if already installed)
+          # (re)install base-devel inside the root – harmless if already present
           pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
 
           # Run makepkg inside the temporary Arch root
