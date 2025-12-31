@@ -89,9 +89,14 @@ jobs:
             echo "=== Number of PKGBUILD directories:  $(wc -l < /tmp/pkgdirs.txt) ==="
 
             # ---- 7️⃣ Build packages one by one with full output ---------------
+            echo "=== About to start building packages ==="
             while IFS= read -r dir; do
               echo "=== Building $dir ==="
+              echo "=== DEBUG: dir variable = '$dir' ==="
               cd "/src/$dir" || { echo "❌ Failed to cd into $dir"; exit 1; }
+              echo "=== DEBUG: pwd after cd = $(pwd) ==="
+              echo "=== DEBUG: ls of current directory ==="
+              ls -la
               
               echo "--- Running makepkg in $dir ---"
               su - builduser -c "cd '/src/$dir' && makepkg -sf --noconfirm" || { echo "❌ makepkg failed in $dir"; exit 1; }
@@ -105,11 +110,12 @@ jobs:
               echo "✅ Successfully built and copied packages from $dir"
               echo ""
             done < /tmp/pkgdirs.txt
+            echo "=== Finished building all packages ==="
 
             # ---- 8️⃣ Debug: what got copied ---------------------------------------
             echo "=== Files now present in /repo ==="
             ls -l /repo
-            EOS
+EOS
 
       # -------------------------------------------------
       # 5️⃣ Verify that packages really exist
