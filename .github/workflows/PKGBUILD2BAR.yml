@@ -59,12 +59,26 @@ jobs:
             exit 1
           fi
 
+      - name: Setup GPG for signing
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+          echo "allow-loopback-pinentry" >> ~/. gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+
       - name: Generate repo metadata
         run: |
           mkdir -p /tmp/repo
           cp /tmp/arch-packages/*.pkg.tar.* /tmp/repo/
           cd /tmp/repo
-          repo-add BAR.db.tar.gz *.pkg.tar.*
+          
+          # Sign each package
+          for pkg in *.pkg.tar.*; do
+            gpg --detach-sign --use-agent --no-armor --pinentry-mode loopback \
+              --passphrase "${{ secrets.GPG_PASSPHRASE }}" "$pkg"
+          done
+          
+          # Create repo database with signing
+          repo-add --sign BAR.db.tar.gz *.pkg.tar.*
 
       - name: Push repo to www branch
         run: |
