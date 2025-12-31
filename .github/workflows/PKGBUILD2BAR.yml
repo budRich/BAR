@@ -23,71 +23,54 @@ jobs:
           ref: master
 
       # -------------------------------------------------
-      # 2️⃣ Install Arch tools (pacman, base-devel, git)
+      # 2️⃣ Install Arch tools (arch‑install‑scripts, base-devel, git, parallel)
       # -------------------------------------------------
-      - name: Install Arch Linux base
+      - name: Install Arch toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y debootstrap
-          sudo debootstrap --arch=amd64 --variant=minbase focal /tmp/archroot http://archive.ubuntu.com/ubuntu/
-          sudo chroot /tmp/archroot /bin/bash -c "pacman -Sy --noconfirm arch-install-scripts base-devel git"
+          sudo apt-get install -y \
+            arch-install-scripts \
+            base-devel \
+            git \
+            parallel
 
       # -------------------------------------------------
-      # 3️⃣ Build every package – using GNU parallel
+      # 3️⃣ Build every package – parallel version
       # -------------------------------------------------
-      - name: Install GNU parallel (inside the chroot)
-        run: |
-          sudo chroot /tmp/archroot /bin/bash -c "pacman -Sy --noconfirm parallel"
-
       - name: Build packages with parallel
         env:
           REPO_DIR: ${{ runner.temp }}/repo
         run: |
           mkdir -p "$REPO_DIR"
 
-          # 1️⃣ Find every directory that contains a PKGBUILD and output the
-          #    absolute path of that directory (one per line)
+          # 1️⃣ List each unique directory that contains a PKGBUILD
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
 
-          # 2️⃣ Export a small helper function that will be run inside the chroot
-          #    for each package directory.  The function builds the package and
-          #    copies the resulting .pkg.tar.* files back to $REPO_DIR.
+          # 2️⃣ Helper script that will be called by parallel
           cat <<'EOF' > build_one.sh
           #!/usr/bin/env bash
           set -e
           PKGDIR="$1"
-          REPO_DIR="/workdir/__repo_tmp"
+          REPO_TMP="/tmp/repo_tmp"
 
           echo "=== Building $PKGDIR ==="
           cd "$PKGDIR"
-          # Build the package (force rebuild, no prompts)
+          # -sf : force rebuild, ignore existing .pkg files
+          # --noconfirm : no interactive prompts
           makepkg -sf --noconfirm
-
-          # Move any generated package files to the shared repo directory
-          cp ./*.pkg.tar.* "$REPO_DIR"/
+          cp ./*.pkg.tar.* "$REPO_TMP"/
           EOF
           chmod +x build_one.sh
 
-          # 3️⃣ Copy the helper script into the chroot
-          sudo cp build_one.sh /tmp/archroot/workdir/
+          # 3️⃣ Create a temporary folder that parallel can write into
+          mkdir -p /tmp/repo_tmp
 
-          # 4️⃣ Create a temporary directory inside the chroot that will be
-          #    shared with the host runner (so we can collect the packages)
-          sudo chroot /tmp/archroot /bin/bash -c "
-            mkdir -p /workdir/__repo_tmp
-          "
+          # 4️⃣ Run GNU parallel – one job per CPU core
+          parallel --jobs "$(nproc)" \
+            ./build_one.sh {} :::: pkgdirs.txt
 
-          # 5️⃣ Run GNU parallel inside the chroot, feeding it the list of
-          #    package directories.  Each job calls the helper script.
-          sudo chroot /tmp/archroot /bin/bash -c "
-            export -f build_one.sh
-            parallel --jobs $(nproc) \
-                     /workdir/build_one.sh {} \
-                     :::: /workdir/pkgdirs.txt
-          "
-
-          # 6️⃣ Pull the built packages out of the chroot into the host runner
-          sudo cp /tmp/archroot/workdir/__repo_tmp/*.pkg.tar.* "$REPO_DIR"/
+          # 5️⃣ Copy the built packages back to the runner’s temp folder
+          cp /tmp/repo_tmp/*.pkg.tar.* "$REPO_DIR"/
 
 
       # -------------------------------------------------
