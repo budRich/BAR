@@ -35,45 +35,51 @@ jobs:
             archlinux:latest \
             bash -eux <<'EOS'
           # -------------------------------------------------
-          # Install everything we need
+          # 1️⃣ Install required tools
           # -------------------------------------------------
           pacman -Sy --noconfirm base-devel git gnupg parallel fakeroot
+
           # Refresh PATH (pacman may have added /usr/bin)
           source /etc/profile
 
           # -------------------------------------------------
-          # Initialise pacman keyring (required by makepkg)
+          # 2️⃣ Initialise pacman keyring (required by makepkg)
           # -------------------------------------------------
           pacman-key --init
           pacman-key --populate archlinux
 
           # -------------------------------------------------
-          # Find all directories that contain a PKGBUILD
+          # 3️⃣ Populate a minimal pacman package database
+          # -------------------------------------------------
+          pacman -Sy --noconfirm   # pulls core repos so makepkg can resolve deps
+
+          # -------------------------------------------------
+          # 4️⃣ Locate all PKGBUILD directories
           # -------------------------------------------------
           find . -type f -name PKGBUILD -printf '%h\n' | sort -u > /tmp/pkgdirs.txt
           echo "PKGBUILD directories found:"
           cat /tmp/pkgdirs.txt
 
           # -------------------------------------------------
-          # Helper that builds a single package
+          # 5️⃣ Helper that builds a single package
           # -------------------------------------------------
           build_one() {
             local dir="$1"
             echo "=== Building $dir ==="
             cd "$dir"
-            # makepkg will fail on any error; we let the script abort
+            # -s installs missing deps, -f forces overwrite, -c cleans up, -r removes after build
             makepkg -sf --noconfirm
             cp ./*.pkg.tar.* /repo/
           }
           export -f build_one
 
           # -------------------------------------------------
-          # Run builds in parallel – abort if any job fails
+          # 6️⃣ Run builds in parallel – abort on first failure
           # -------------------------------------------------
           parallel --halt now,fail=1 --jobs "$(nproc)" build_one ::: $(cat /tmp/pkgdirs.txt)
 
           # -------------------------------------------------
-          # Show what was produced (debug)
+          # 7️⃣ Debug: list what was copied to /repo
           # -------------------------------------------------
           echo "=== Files copied to /repo ==="
           ls -l /repo
