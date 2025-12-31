@@ -51,7 +51,7 @@ jobs:
 
           docker run --rm \
             -v "${{ github.workspace }}:/src" \
-            -v "$REPO_DIR:/repo" \
+            -v "${REPO_DIR}:/repo" \
             -w /src \
             archlinux:latest \
             bash -eux <<'EOS'
