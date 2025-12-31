@@ -20,7 +20,7 @@ jobs:
           submodules: true
 
       - name: Build Arch packages
-        uses: archlinux-pkgbuild/action@v1
+        uses: FFY00/archlinux-pkgbuild-action@v1
         with:
           output-dir: ${{ runner.temp }}/arch-packages
 
