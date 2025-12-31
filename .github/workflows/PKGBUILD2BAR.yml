@@ -35,7 +35,7 @@ jobs:
             gnupg          # needed by pacman-key
 
       # -------------------------------------------------
-      # 3️⃣ Create a temporary Arch root and install the real pacman + base-devel
+      # 3️⃣ Set up a temporary Arch root **and install pacman first**
       # -------------------------------------------------
       - name: Set up temporary Arch root
         env:
@@ -43,18 +43,26 @@ jobs:
         run: |
           mkdir -p "$ARCH_ROOT"
 
-          # Initialise a minimal pacman database inside the root
-          sudo pacman-key --init               # creates the keyring directory (empty)
-          sudo pacman-key --populate archlinux # populate with Arch keyring
-
-          # Install the *Arch* pacman package (contains pacman & pacman-key)
+          # -----------------------------------------------------------------
+          # 3a – Install the *Arch* pacman package (contains pacman & pacman‑key)
+          # -----------------------------------------------------------------
           sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" pacman
 
-          # Now we can use pacman‑key inside the root
-          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm archlinux-keyring
+          # -----------------------------------------------------------------
+          # 3b – Initialise the pacman keyring (now pacman-key exists)
+          # -----------------------------------------------------------------
+          sudo pacman-key --init               # creates /etc/pacman.d/gnupg inside the root
+          sudo pacman-key --populate archlinux
 
-          # Install the full base-devel group into the temporary root
-          sudo pacman --root "$ARCH_ROOT" -Sy --noconfirm base-devel
+          # -----------------------------------------------------------------
+          # 3c – Install the Arch keyring package (provides the trusted keys)
+          # -----------------------------------------------------------------
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" archlinux-keyring
+
+          # -----------------------------------------------------------------
+          # 3d – Install the full base-devel group into the temporary root
+          # -----------------------------------------------------------------
+          sudo pacman -Sy --noconfirm --root "$ARCH_ROOT" base-devel
 
       # -------------------------------------------------
       # 4️⃣ Build packages in parallel (using the temporary Arch root)
