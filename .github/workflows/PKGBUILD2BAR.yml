@@ -50,7 +50,7 @@ jobs:
           mkdir -p "$REPO_DIR"
 
           docker run --rm \
-            -v "${{ github.workspace }}:/src:ro" \
+            -v "${{ github.workspace }}:/src" \
             -v "$REPO_DIR:/repo" \
             -w /src \
             archlinux:latest \
