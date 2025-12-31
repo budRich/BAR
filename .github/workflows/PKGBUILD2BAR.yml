@@ -10,35 +10,20 @@ jobs:
   build-repo:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed for the final push to the www branch
+      contents: write
 
     steps:
-      # -------------------------------------------------
-      # 1️⃣ Checkout the repository (including submodules if any)
-      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: true
 
-      # -------------------------------------------------
-      # 2️⃣ Build every PKGBUILD with the Marketplace action
-      # -------------------------------------------------
       - name: Build Arch packages
-        uses: devops-infra/action-arch-pkgbuild@v1
+        uses: archlinux-pkgbuild-action@v1
         with:
-          # The action automatically:
-          #   • installs pacman, base-devel, gnupg, fakeroot
-          #   • runs pacman-key --init && pacman-key --populate archlinux
-          #   • runs makepkg -sf --noconfirm for each PKGBUILD it finds
-          #   • copies the resulting *.pkg.tar.* files to ${{ runner.temp }}/arch-packages
-          output-dir: ${{ runner.temp }}/arch-packages   # <‑‑ where the .pkg files will be placed
-          extra-packages: sed gawk   # space‑separated list
+          output-dir: ${{ runner.temp }}/arch-packages
 
-      # -------------------------------------------------
-      # 3️⃣ Verify that packages were produced (optional but helpful)
-      # -------------------------------------------------
       - name: List built packages
         run: |
           echo "=== Packages built ==="
@@ -48,9 +33,6 @@ jobs:
             exit 1
           fi
 
-      # -------------------------------------------------
-      # 4️⃣ Create the Arch repo database
-      # -------------------------------------------------
       - name: Generate repo metadata
         env:
           REPO_DIR: ${{ runner.temp }}/repo
@@ -61,9 +43,6 @@ jobs:
           cd "$REPO_DIR"
           repo-add "${REPO_NAME}.db.tar.gz" *.pkg.tar.*
 
-      # -------------------------------------------------
-      # 5️⃣ Push the repo to the www (GitHub Pages) branch
-      # -------------------------------------------------
       - name: Push repo to www branch
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
