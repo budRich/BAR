@@ -1,0 +1,131 @@
+name: Build Arch repo
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**/PKGBUILD'   # trigger only when a PKGBUILD changes
+
+jobs:
+  build-repo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push to www branch
+
+    steps:
+      # -------------------------------------------------
+      # 1️⃣ Checkout the repository (both branches)
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # fetch all history so we can push
+          ref: master
+
+      # -------------------------------------------------
+      # 2️⃣ Install Arch tools (pacman, base-devel, git)
+      # -------------------------------------------------
+      - name: Install Arch Linux base
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap
+          sudo debootstrap --arch=amd64 --variant=minbase focal /tmp/archroot http://archive.ubuntu.com/ubuntu/
+          sudo chroot /tmp/archroot /bin/bash -c "pacman -Sy --noconfirm arch-install-scripts base-devel git"
+
+      # -------------------------------------------------
+      # 3️⃣ Build every package – using GNU parallel
+      # -------------------------------------------------
+      - name: Install GNU parallel (inside the chroot)
+        run: |
+          sudo chroot /tmp/archroot /bin/bash -c "pacman -Sy --noconfirm parallel"
+
+      - name: Build packages with parallel
+        env:
+          REPO_DIR: ${{ runner.temp }}/repo
+        run: |
+          mkdir -p "$REPO_DIR"
+
+          # 1️⃣ Find every directory that contains a PKGBUILD and output the
+          #    absolute path of that directory (one per line)
+          find . -type f -name PKGBUILD -printf '%h\n' | sort -u > pkgdirs.txt
+
+          # 2️⃣ Export a small helper function that will be run inside the chroot
+          #    for each package directory.  The function builds the package and
+          #    copies the resulting .pkg.tar.* files back to $REPO_DIR.
+          cat <<'EOF' > build_one.sh
+          #!/usr/bin/env bash
+          set -e
+          PKGDIR="$1"
+          REPO_DIR="/workdir/__repo_tmp"
+
+          echo "=== Building $PKGDIR ==="
+          cd "$PKGDIR"
+          # Build the package (force rebuild, no prompts)
+          makepkg -sf --noconfirm
+
+          # Move any generated package files to the shared repo directory
+          cp ./*.pkg.tar.* "$REPO_DIR"/
+          EOF
+          chmod +x build_one.sh
+
+          # 3️⃣ Copy the helper script into the chroot
+          sudo cp build_one.sh /tmp/archroot/workdir/
+
+          # 4️⃣ Create a temporary directory inside the chroot that will be
+          #    shared with the host runner (so we can collect the packages)
+          sudo chroot /tmp/archroot /bin/bash -c "
+            mkdir -p /workdir/__repo_tmp
+          "
+
+          # 5️⃣ Run GNU parallel inside the chroot, feeding it the list of
+          #    package directories.  Each job calls the helper script.
+          sudo chroot /tmp/archroot /bin/bash -c "
+            export -f build_one.sh
+            parallel --jobs $(nproc) \
+                     /workdir/build_one.sh {} \
+                     :::: /workdir/pkgdirs.txt
+          "
+
+          # 6️⃣ Pull the built packages out of the chroot into the host runner
+          sudo cp /tmp/archroot/workdir/__repo_tmp/*.pkg.tar.* "$REPO_DIR"/
+
+
+      # -------------------------------------------------
+      # 4️⃣ Create repo database files
+      # -------------------------------------------------
+      - name: Generate repo metadata
+        env:
+          REPO_DIR: ${{ runner.temp }}/repo
+          REPO_NAME: BAR
+        run: |
+          sudo chroot /tmp/archroot /bin/bash -c "
+            cd /workdir && \
+            repo-add ${REPO_NAME}.db.tar.gz ${REPO_DIR}/*.pkg.tar.*
+          "
+          # Move the db files into the repo directory
+          sudo cp "${REPO_DIR}/${REPO_NAME}.db.tar.gz" "$REPO_DIR/"
+          sudo cp "${REPO_DIR}/${REPO_NAME}.files.tar.gz" "$REPO_DIR/"
+
+      # -------------------------------------------------
+      # 5️⃣ Commit & push to the www branch
+      # -------------------------------------------------
+      - name: Push repo to www branch
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_NAME: BAR
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+
+          # Switch to (or create) the www branch
+          git checkout www || git checkout -b www
+
+          # Clean old repo folder and copy the new one
+          rm -rf repo
+          mkdir -p repo
+          cp -r "${{ runner.temp }}/repo/"* repo/
+
+          # Add, commit, and push
+          git add repo
+          git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes to commit"
+          git push origin www
