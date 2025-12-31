@@ -8,12 +8,9 @@ on:
 
 jobs:
   build-repo:
-    runs-on: ubuntu-latest          # host is Ubuntu, we run Arch inside Docker
+    runs-on: ubuntu-latest          # host OS
     permissions:
       contents: write
-
-    services:
-      # Docker is already available on the runner; no extra service needed.
 
     steps:
       # -------------------------------------------------
