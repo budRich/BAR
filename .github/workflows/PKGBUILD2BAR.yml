@@ -99,12 +99,19 @@ jobs:
             [[ "$pkg" == *.sig ]] && continue
             echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
               --pinentry-mode loopback --detach-sign --no-armor "$pkg"
-            PKG_FILES="$PKG_FILES $pkg"
           done
           
-          # Create repo database with signing
-          echo "${{ secrets.GPG_PASSPHRASE }}" | repo-add --sign --key 48E97CE0936581E3 \
-            --verify BAR.db.tar.gz ${PKG_FILES}
+          # Create repo database (without signing initially)
+          repo-add BAR.db.tar.gz *.pkg.tar.zst
+          
+          # Now sign the database files
+          for db in BAR.db.tar.gz BAR.files.tar.gz; do
+            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback --detach-sign --no-armor "$db"
+          done
+          
+          # Verify signatures were created
+          ls -la *.sig
 
       - name: Push repo to www branch
         run: |
