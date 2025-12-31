@@ -96,6 +96,7 @@ jobs:
           
           # Sign each package
           for pkg in *.pkg.tar.*; do
+            [[ "$pkg" == *.sig ]] && continue
             echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
               --pinentry-mode loopback --detach-sign --no-armor "$pkg"
           done
