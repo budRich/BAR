@@ -1,5 +1,0 @@
-# Add this to your pacman.conf [BAR] section as:
-# Server = https://github.com/budRich/BAR/releases/download/build-2026.01.01-232408
-# 
-# Or use the add-repo.bash script which should handle this automatically.
-https://github.com/budRich/BAR/releases/download/build-2026.01.01-232408
