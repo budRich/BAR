@@ -25,97 +25,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name:  Build packages
-        run: |
-          mkdir -p /tmp/arch-packages
-          
-          # Create a build user once (can't build as root)
-          useradd -m builduser
-          echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
-          
-          # Find all PKGBUILD files and build them
-          find . -name PKGBUILD -type f | while read pkgbuild; do
-            pkg_dir=$(dirname "$pkgbuild")
-            echo "Building package in $pkg_dir"
-            cd "$GITHUB_WORKSPACE/$pkg_dir"
-            
-            # Clean up any lingering faked processes to prevent IPC errors
-            pkill faked || true
-            
-            chown -R builduser:builduser . 
-            
-            # Build the package
-            sudo -u builduser makepkg -s --nodeps --noconfirm
-            
-            # Copy built packages
-            cp *.pkg.tar.* /tmp/arch-packages/ || true
-            
-            cd "$GITHUB_WORKSPACE"
-          done
-
-      - name: List built packages
-        run: |
-          echo "=== Packages built ==="
-          ls -lh /tmp/arch-packages
-          if [ !  -e /tmp/arch-packages/*.pkg.tar.* ]; then
-            echo "❌ No packages were built – aborting."
-            exit 1
-          fi
+      - name: Build packages
+        run: bash .github/scripts/build-packages.sh
 
       - name: Setup GPG for signing
-        run: |
-          # Create GPG home directory with proper permissions
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          
-          # Configure GPG for non-interactive use
-          cat > ~/.gnupg/gpg.conf <<EOF
-          use-agent
-          pinentry-mode loopback
-          no-tty
-          batch
-          yes
-          EOF
-          
-          # Configure GPG Agent to allow loopback (prevents ioctl errors)
-          echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
-          gpg-connect-agent reloadagent /bye
-          
-          # Import the private key
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          
-          # Trust the key ultimately
-          echo -e "5\ny\n" | gpg --command-fd 0 --expert --edit-key 03932D58D15CB5F4E5799586E9C940B5E6BE4258 trust quit || true
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: 03932D58D15CB5F4E5799586E9C940B5E6BE4258
+        run: bash .github/scripts/setup-gpg.sh
 
       - name: Generate repo metadata
-        run: |
-          mkdir -p /tmp/repo
-          cp /tmp/arch-packages/*.pkg.tar.* /tmp/repo/
-          cd /tmp/repo
-          
-          # Sign each package
-          for pkg in *.pkg.tar.*; do
-            [[ "$pkg" == *.sig ]] && continue
-            gpg --batch --yes --detach-sign --no-armor "$pkg"
-          done
-          
-          # Create and sign repo database
-          # Using --sign ensures repo-add creates the correct .sig symlinks (BAR.db.sig -> BAR.db.tar.gz.sig)
-          repo-add --sign --key 03932D58D15CB5F4E5799586E9C940B5E6BE4258 BAR.db.tar.gz *.pkg.tar.zst
-          
-          # Verify signatures were created
-          ls -la *.sig
+        env:
+          GPG_KEY_ID: 03932D58D15CB5F4E5799586E9C940B5E6BE4258
+        run: bash .github/scripts/generate-repo.sh
 
       - name: Push repo to www branch
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "github-actions"
-          git fetch origin www || git checkout --orphan www
-          git checkout www || git checkout --orphan www
-          rm -rf repo
-          mkdir -p repo
-          cp -rL /tmp/repo/* repo/
-          git add repo
-          git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
-          git push origin www
+        run: bash .github/scripts/push-repo.sh
