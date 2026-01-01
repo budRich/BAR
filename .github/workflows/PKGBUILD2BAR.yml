@@ -70,17 +70,7 @@ jobs:
           no-tty
           batch
           yes
-          pinentry-mode loopback
           EOF
-          
-          cat > ~/.gnupg/gpg-agent.conf <<EOF
-          allow-loopback-pinentry
-          max-cache-ttl 7200
-          default-cache-ttl 7200
-          EOF
-          
-          # Kill any existing agent
-          gpgconf --kill gpg-agent || true
           
           # Import the private key
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
@@ -97,17 +87,16 @@ jobs:
           # Sign each package
           for pkg in *.pkg.tar.*; do
             [[ "$pkg" == *.sig ]] && continue
-            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
-              --pinentry-mode loopback --detach-sign --no-armor "$pkg"
+            gpg --batch --yes --detach-sign --no-armor "$pkg"
           done
           
-          # Create repo database (without signing initially)
-          repo-add BAR.db.tar.gz *.pkg.tar.zst
+          # Create and sign repo database
+          # Using --sign ensures repo-add creates the correct .sig symlinks (BAR.db.sig -> BAR.db.tar.gz.sig)
+          repo-add --sign --key 48E97CE0936581E3 BAR.db.tar.gz *.pkg.tar.zst
           
           # Now sign the database files
           for db in BAR.db.tar.gz BAR.files.tar.gz; do
-            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 \
-              --pinentry-mode loopback --detach-sign --no-armor "$db"
+            gpg --batch --yes --detach-sign --no-armor "$db"
           done
           
           # Verify signatures were created
