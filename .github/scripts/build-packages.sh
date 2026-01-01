@@ -9,9 +9,9 @@ echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
 
 # Check if database exists on www branch
 cd "$GITHUB_WORKSPACE"
-git fetch origin www 2>/dev/null || true
+git fetch origin www:refs/remotes/origin/www 2>/dev/null || true
 DB_EXISTS=false
-if git rev-parse origin/www >/dev/null 2>&1; then
+if git show-ref --verify --quiet refs/remotes/origin/www; then
   if git show origin/www:repo/BAR.db.tar.gz >/dev/null 2>&1; then
     echo "✓ Database exists on www branch"
     DB_EXISTS=true
@@ -24,7 +24,12 @@ fi
 
 # Get list of changed PKGBUILD files in the last commit
 echo "Detecting changed PKGBUILD files..."
-CHANGED_PKGBUILDS=$(git diff --name-only HEAD~1 HEAD | grep 'PKGBUILD$' || true)
+CHANGED_PKGBUILDS=""
+if git rev-parse HEAD~1 >/dev/null 2>&1; then
+  CHANGED_PKGBUILDS=$(git diff --name-only HEAD~1 HEAD | grep 'PKGBUILD$' || true)
+else
+  echo "⚠️ No previous commit found (shallow clone or first commit)"
+fi
 
 if [ "$DB_EXISTS" = false ]; then
   echo "Building all packages (first run)..."
