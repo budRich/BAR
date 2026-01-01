@@ -19,45 +19,41 @@ for pkg in *.pkg.tar.zst; do
   gh release upload "$RELEASE_TAG" "$pkg" "$pkg.sig" --repo "$GITHUB_REPOSITORY"
 done
 
-# Modify database to use full URLs for packages
-REPO_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-echo "Modifying database to use release URLs..."
+# Download existing database from www branch if it exists
+cd "$GITHUB_WORKSPACE"
+git fetch origin www 2>/dev/null || true
+if git show origin/www:repo/BAR.db.tar.gz > /tmp/existing-BAR.db.tar.gz 2>/dev/null; then
+  echo "Found existing database, will update it..."
+  cp /tmp/existing-BAR.db.tar.gz /tmp/repo/BAR.db.tar.gz
+else
+  echo "No existing database found, creating new one..."
+fi
 
-# Extract the database
-mkdir -p /tmp/db-extract
-cd /tmp/db-extract
-tar -xzf /tmp/repo/BAR.db.tar.gz
-
-# Update FILENAME entries to full URLs in each package desc file
-for pkg_dir in */; do
-  if [ -f "${pkg_dir}desc" ]; then
-    # Replace the filename with full URL
-    sed -i "s|^\\(.*\\.pkg\\.tar\\.zst\\)$|${REPO_URL}/\\1|" "${pkg_dir}desc"
-  fi
-done
-
-# Repack the modified database
-tar -czf /tmp/repo/BAR.db.tar.gz *
+# Add new packages to the database (this updates existing or creates new)
 cd /tmp/repo
+repo-add --sign --key "$GPG_KEY_ID" BAR.db.tar.gz *.pkg.tar.zst
 
-# Re-sign the modified database
-rm -f BAR.db.tar.gz.sig BAR.db.sig
-gpg --batch --yes --detach-sign --no-armor BAR.db.tar.gz
-ln -sf BAR.db.tar.gz BAR.db
-ln -sf BAR.db.tar.gz.sig BAR.db.sig
+# Create a Server entry file that points to the release
+REPO_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+cat > BAR.server <<EOF
+# Add this to your pacman.conf [BAR] section as:
+# Server = $REPO_URL
+# 
+# Or use the add-repo.bash script which should handle this automatically.
+$REPO_URL
+EOF
 
 # Prepare GitHub Pages repo directory
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
 git config --global user.email "github-actions@github.com"
 git config --global user.name "github-actions"
 cd "$GITHUB_WORKSPACE"
-git fetch origin www || git checkout --orphan www
 git checkout www || git checkout --orphan www
 rm -rf repo
 mkdir -p repo
 
-# Copy only database files to www branch (dereference symlinks)
-cp -L /tmp/repo/BAR.db* /tmp/repo/BAR.files* repo/
+# Copy database files and server info to www branch (dereference symlinks)
+cp -L /tmp/repo/BAR.db* /tmp/repo/BAR.files* /tmp/repo/BAR.server repo/
 
 cd "$GITHUB_WORKSPACE"
 git add repo
