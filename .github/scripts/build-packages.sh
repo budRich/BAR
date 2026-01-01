@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Configure git to trust the repository directory
+git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
 mkdir -p /tmp/arch-packages
 
 # Create a build user once (can't build as root)
