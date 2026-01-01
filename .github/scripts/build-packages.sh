@@ -11,11 +11,15 @@ echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
 cd "$GITHUB_WORKSPACE"
 git fetch origin www 2>/dev/null || true
 DB_EXISTS=false
-if git show origin/www:repo/BAR.db.tar.gz >/dev/null 2>&1; then
-  echo "✓ Database exists on www branch"
-  DB_EXISTS=true
+if git rev-parse origin/www >/dev/null 2>&1; then
+  if git show origin/www:repo/BAR.db.tar.gz >/dev/null 2>&1; then
+    echo "✓ Database exists on www branch"
+    DB_EXISTS=true
+  else
+    echo "⚠️ www branch exists but no database found - will build all packages"
+  fi
 else
-  echo "⚠️ No database found on www branch - will build all packages"
+  echo "⚠️ No www branch found - will build all packages (first run)"
 fi
 
 # Get list of changed PKGBUILD files in the last commit
