@@ -3,7 +3,7 @@
 
 pkgname=typiskt
 pkgver=2022.07.24
-pkgrel=6
+pkgrel=7
 pkgdesc='touchtype training in the terminal'
 arch=('any')
 url='https://github.com/budlabs/typiskt'
