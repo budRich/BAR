@@ -18,7 +18,7 @@ jobs:
       - name: Setup Arch environment
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git
+          pacman -S --noconfirm base-devel git github-cli
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,4 +40,6 @@ jobs:
         run: bash .github/scripts/generate-repo.sh
 
       - name: Push repo to www branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/push-repo.sh

@@ -7,8 +7,37 @@ mkdir -p /tmp/arch-packages
 useradd -m builduser
 echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
 
-# Find all PKGBUILD files and build them
-find . -name PKGBUILD -type f | while read pkgbuild; do
+# Check if database exists on www branch
+cd "$GITHUB_WORKSPACE"
+git fetch origin www 2>/dev/null || true
+DB_EXISTS=false
+if git show origin/www:repo/BAR.db.tar.gz >/dev/null 2>&1; then
+  echo "✓ Database exists on www branch"
+  DB_EXISTS=true
+else
+  echo "⚠️ No database found on www branch - will build all packages"
+fi
+
+# Get list of changed PKGBUILD files in the last commit
+echo "Detecting changed PKGBUILD files..."
+CHANGED_PKGBUILDS=$(git diff --name-only HEAD~1 HEAD | grep 'PKGBUILD$' || true)
+
+if [ "$DB_EXISTS" = false ]; then
+  echo "Building all packages (first run)..."
+  CHANGED_PKGBUILDS=$(find . -name PKGBUILD -type f)
+elif [ -z "$CHANGED_PKGBUILDS" ]; then
+  echo "⚠️ No PKGBUILD files changed in this commit"
+  echo "Building all packages as fallback..."
+  CHANGED_PKGBUILDS=$(find . -name PKGBUILD -type f)
+fi
+
+echo "PKGBUILDs to build:"
+echo "$CHANGED_PKGBUILDS"
+
+# Build only changed packages
+echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
+  [ -z "$pkgbuild" ] && continue
+  
   pkg_dir=$(dirname "$pkgbuild")
   echo "Building package in $pkg_dir"
   cd "$GITHUB_WORKSPACE/$pkg_dir"
