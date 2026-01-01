@@ -5,7 +5,7 @@ echo "Setting up budRich/BAR repository..."
 
 # Import GPG key
 curl -s https://raw.githubusercontent.com/budRich/BAR/master/public-key.asc | sudo pacman-key --add -
-sudo pacman-key --lsign-key F76C6FE1A233104A0C53FB3448E97CE0936581E3
+sudo pacman-key --lsign-key 03932D58D15CB5F4E5799586E9C940B5E6BE4258
 
 if ! grep -q "\[BAR\]" /etc/pacman.conf; then
   echo "" 
