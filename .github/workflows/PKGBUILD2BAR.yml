@@ -102,11 +102,6 @@ jobs:
           # Create and sign repo database
           # Using --sign ensures repo-add creates the correct .sig symlinks (BAR.db.sig -> BAR.db.tar.gz.sig)
           repo-add --sign --key 03932D58D15CB5F4E5799586E9C940B5E6BE4258 BAR.db.tar.gz *.pkg.tar.zst
-
-          # Now sign the database files
-          for db in BAR.db.tar.gz BAR.files.tar.gz; do
-            gpg --batch --yes --detach-sign --no-armor "$db"
-          done
           
           # Verify signatures were created
           ls -la *.sig
@@ -120,7 +115,7 @@ jobs:
           git checkout www || git checkout --orphan www
           rm -rf repo
           mkdir -p repo
-          cp -r /tmp/repo/* repo/
+          cp -rL /tmp/repo/* repo/
           git add repo
           git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
           git push origin www
