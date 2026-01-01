@@ -29,17 +29,17 @@ jobs:
         run: |
           mkdir -p /tmp/arch-packages
           
+          # Create a build user once (can't build as root)
+          useradd -m builduser
+          echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
+          
           # Find all PKGBUILD files and build them
           find . -name PKGBUILD -type f | while read pkgbuild; do
             pkg_dir=$(dirname "$pkgbuild")
             echo "Building package in $pkg_dir"
             cd "$GITHUB_WORKSPACE/$pkg_dir"
             
-            # Create a build user (can't build as root)
-            useradd -m builduser
             chown -R builduser:builduser . 
-
-            echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
             
             # Build the package
             sudo -u builduser makepkg -s --nodeps --noconfirm
