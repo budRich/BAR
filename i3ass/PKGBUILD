@@ -3,7 +3,7 @@
 
 pkgname=i3ass
 pkgver=2025.12.27.1
-pkgrel=2
+pkgrel=3
 pkgdesc='A bash-script collection to assist the use of i3-wm.'
 arch=('any')
 url='https://github.com/budlabs/i3ass'
@@ -20,10 +20,14 @@ _trgdir="$pkgname-$pkgver"
 # url='file:///home/bud/git/i3ass'
 # source=("${pkgname}::git+$url")
 
+build() {
+  cd "$_trgdir"
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+}
+
 package() {
   cd "$_trgdir"
 
-  make DESTDIR="$pkgdir/" PREFIX=/usr
   make DESTDIR="$pkgdir/" PREFIX=/usr install
 
   install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE

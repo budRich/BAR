@@ -3,7 +3,7 @@
 
 pkgname=typiskt
 pkgver=2022.07.24
-pkgrel=1
+pkgrel=2
 pkgdesc='touchtype training in the terminal'
 arch=('any')
 url='https://github.com/budlabs/typiskt'
@@ -17,6 +17,11 @@ sha256sums=('227be4406d7004625455352c379792baceca4ede086b901bccca7075be33d258')
 # sha256sums=('SKIP')
 # url='file:///home/bud/git/lab/typiskt'
 # source=("${pkgname}-${pkgver}::git+$url")
+
+build() {
+  cd "$pkgname-$pkgver"
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+}
 
 package() {
   cd "$pkgname-$pkgver"

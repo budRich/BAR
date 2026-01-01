@@ -39,6 +39,9 @@ jobs:
             echo "Building package in $pkg_dir"
             cd "$GITHUB_WORKSPACE/$pkg_dir"
             
+            # Clean up any lingering faked processes to prevent IPC errors
+            pkill faked || true
+            
             chown -R builduser:builduser . 
             
             # Build the package
@@ -93,7 +96,7 @@ jobs:
           # Create and sign repo database
           # Using --sign ensures repo-add creates the correct .sig symlinks (BAR.db.sig -> BAR.db.tar.gz.sig)
           repo-add --sign --key 48E97CE0936581E3 BAR.db.tar.gz *.pkg.tar.zst
-          
+
           # Now sign the database files
           for db in BAR.db.tar.gz BAR.files.tar.gz; do
             gpg --batch --yes --detach-sign --no-armor "$db"
