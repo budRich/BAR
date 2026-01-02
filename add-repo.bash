@@ -10,7 +10,7 @@ sudo pacman-key --lsign-key 03932D58D15CB5F4E5799586E9C940B5E6BE4258
 if ! grep -q "\[BAR\]" /etc/pacman.conf; then
   echo "" 
   echo "[BAR]"
-  echo "Server = https://raw.githubusercontent.com/budRich/BAR/www/repo"
+  echo "Server = https://github.com/budRich/BAR/releases/latest/download"
   echo "SigLevel = Required DatabaseOptional"
 fi | sudo tee -a /etc/pacman.conf
 

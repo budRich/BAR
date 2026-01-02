@@ -39,7 +39,8 @@ jobs:
           GPG_KEY_ID: 03932D58D15CB5F4E5799586E9C940B5E6BE4258
         run: bash .github/scripts/generate-repo.sh
 
-      - name: Push repo to www branch
+      - name: Create release with all packages
         env:
           GH_TOKEN: ${{ github.token }}
+          GPG_KEY_ID: 03932D58D15CB5F4E5799586E9C940B5E6BE4258
         run: bash .github/scripts/push-repo.sh

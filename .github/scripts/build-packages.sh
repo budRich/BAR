@@ -10,19 +10,16 @@ mkdir -p /tmp/arch-packages
 useradd -m builduser
 echo "builduser ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers
 
-# Check if database exists on www branch
+# Check if there's a previous release
 cd "$GITHUB_WORKSPACE"
-git fetch origin www:refs/remotes/origin/www 2>/dev/null || true
+LATEST_RELEASE=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 | cut -f1 || true)
 DB_EXISTS=false
-if git show-ref --verify --quiet refs/remotes/origin/www; then
-  if git show origin/www:repo/BAR.db.tar.gz >/dev/null 2>&1; then
-    echo "✓ Database exists on www branch"
-    DB_EXISTS=true
-  else
-    echo "⚠️ www branch exists but no database found - will build all packages"
-  fi
+
+if [ -n "$LATEST_RELEASE" ]; then
+  echo "✓ Found latest release: $LATEST_RELEASE"
+  DB_EXISTS=true
 else
-  echo "⚠️ No www branch found - will build all packages (first run)"
+  echo "⚠️ No previous release found - will build all packages (first run)"
 fi
 
 # Get list of changed PKGBUILD files in the last commit

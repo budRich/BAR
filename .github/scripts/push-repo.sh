@@ -1,7 +1,40 @@
 #!/bin/bash
 set -e
 
-# Create release with timestamp as archive
+# Download all packages from the latest release
+echo "Fetching packages from latest release..."
+mkdir -p /tmp/all-packages
+cd /tmp/all-packages
+
+LATEST_RELEASE=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 | cut -f1 || true)
+
+if [ -n "$LATEST_RELEASE" ]; then
+  echo "Downloading packages from release: $LATEST_RELEASE"
+  gh release download "$LATEST_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "*.pkg.tar.zst" --pattern "*.pkg.tar.zst.sig" 2>/dev/null || true
+else
+  echo "No previous release found, this is the first release"
+fi
+
+# Copy newly built packages and remove old versions
+cd /tmp/repo
+for pkg in *.pkg.tar.zst; do
+  # Extract package name without version (e.g., i3ass from i3ass-2025.12.27.1-5-any.pkg.tar.zst)
+  pkgname=$(echo "$pkg" | sed -E 's/^([^0-9]+)-[0-9].*/\1/')
+  
+  # Remove old versions of this package
+  echo "Removing old versions of $pkgname..."
+  rm -f /tmp/all-packages/${pkgname}-*.pkg.tar.zst*
+  
+  # Copy new version
+  echo "Adding new version: $pkg"
+  cp "$pkg" "$pkg.sig" /tmp/all-packages/
+done
+
+# Rebuild the complete database with all packages
+cd /tmp/all-packages
+repo-add --sign --key "$GPG_KEY_ID" BAR.db.tar.gz *.pkg.tar.zst
+
+# Create release with timestamp
 RELEASE_TAG="build-$(date +%Y.%m.%d-%H%M%S)"
 RELEASE_NAME="Arch Packages $(date +%Y-%m-%d)"
 
@@ -12,64 +45,29 @@ gh release create "$RELEASE_TAG" \
   --notes "Automated package build from commit ${GITHUB_SHA:0:7}" \
   --repo "$GITHUB_REPOSITORY"
 
-# Upload newly built packages to the release as archive
-cd /tmp/repo
-for pkg in *.pkg.tar.zst; do
-  echo "Uploading $pkg to release..."
-  gh release upload "$RELEASE_TAG" "$pkg" "$pkg.sig" --repo "$GITHUB_REPOSITORY"
+# Upload ALL packages and database files to the release
+echo "Uploading all packages and database to release..."
+cd /tmp/all-packages
+for file in *; do
+  echo "Uploading $file..."
+  gh release upload "$RELEASE_TAG" "$file" --repo "$GITHUB_REPOSITORY"
 done
 
-# Download existing packages from www branch
-echo "Fetching existing packages from www branch..."
-mkdir -p /tmp/all-packages
-cd /tmp/all-packages
+echo "✓ Release $RELEASE_TAG created successfully!"
 
-git config --global --add safe.directory "$GITHUB_WORKSPACE"
-cd "$GITHUB_WORKSPACE"
-git fetch origin www 2>/dev/null || true
+# Delete all old releases (keep only the latest)
+echo "Cleaning up old releases..."
+OLD_RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 | grep -v "^$RELEASE_TAG" | cut -f1 || true)
 
-if git rev-parse origin/www >/dev/null 2>&1; then
-  echo "Downloading existing packages from www branch..."
-  git checkout www
-  if [ -d repo ]; then
-    cp repo/*.pkg.tar.zst* /tmp/all-packages/ 2>/dev/null || true
-  fi
-  git checkout -
+if [ -n "$OLD_RELEASES" ]; then
+  echo "$OLD_RELEASES" | while read old_release; do
+    [ -z "$old_release" ] && continue
+    echo "Deleting old release: $old_release"
+    gh release delete "$old_release" --repo "$GITHUB_REPOSITORY" --yes
+  done
+  echo "✓ Old releases cleaned up"
 else
-  echo "No www branch found, this is the first run"
+  echo "No old releases to delete"
 fi
 
-# Copy newly built packages and extract package names
-cd /tmp/repo
-for pkg in *.pkg.tar.zst; do
-  # Extract package name without version (e.g., i3ass from i3ass-2025.12.27.1-5-any.pkg.tar.zst)
-  pkgname=$(echo "$pkg" | sed -E 's/^([^0-9]+)-[0-9].*/\1/')
-  
-  # Remove old versions of this package from all-packages
-  echo "Removing old versions of $pkgname..."
-  rm -f /tmp/all-packages/${pkgname}-*.pkg.tar.zst*
-  
-  # Copy new version
-  echo "Adding new version: $pkg"
-  cp "$pkg" "$pkg.sig" /tmp/all-packages/
-done
-
-# Rebuild the complete database with only latest packages
-cd /tmp/all-packages
-repo-add --sign --key "$GPG_KEY_ID" BAR.db.tar.gz *.pkg.tar.zst
-
-# Prepare GitHub Pages repo directory
-git config --global user.email "github-actions@github.com"
-git config --global user.name "github-actions"
-cd "$GITHUB_WORKSPACE"
-git checkout www || git checkout --orphan www
-rm -rf repo
-mkdir -p repo
-
-# Copy latest packages and database files to www branch (dereference symlinks)
-cp -L /tmp/all-packages/* repo/
-
-cd "$GITHUB_WORKSPACE"
-git add repo
-git commit -m "Update Arch repo (auto) [skip ci]" || echo "No changes"
-git push origin www
+echo "✓ Packages available at: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/"
