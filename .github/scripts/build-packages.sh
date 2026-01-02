@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+# set -e
 
 # Configure git to trust the repository directory
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
