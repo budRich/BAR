@@ -2,3 +2,8 @@ pkg/*/*
 !pkg/*/.gitignore
 !pkg/*/.SRCINFO
 !pkg/*/PKGBUILD
+!pkg/*/*.patch
+!pkg/*/*.hook
+!pkg/*/*.install
+!pkg/*/LICENSE*
+notes.md
