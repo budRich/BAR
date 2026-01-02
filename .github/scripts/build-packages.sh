@@ -55,9 +55,18 @@ echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
   pkill faked || true
   
   chown -R builduser:builduser . 
+
+  declare -a makedepends
+  str_depends=$(grep '^makedepends' PKGBUILD)
+
+  if [[ $str_depends ]]; then
+    eval "$str_depends"
+    pacman -S "${makedepends[@]}"
+    unset 'makedepends[@]'
+  fi
   
   # Build the package
-  sudo -u builduser makepkg -s --nodeps --noconfirm
+  sudo -u builduser makepkg --nodeps --noconfirm
   
   # Copy built packages
   cp *.pkg.tar.* /tmp/arch-packages/ || true
