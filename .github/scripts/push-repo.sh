@@ -57,13 +57,13 @@ echo "✓ Release $RELEASE_TAG created successfully!"
 
 # Delete all old releases (keep only the latest)
 echo "Cleaning up old releases..."
-OLD_RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 | grep -v "^$RELEASE_TAG" | cut -f1 || true)
+OLD_RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 | cut -f3 | grep -v "^$RELEASE_TAG$" || true)
 
 if [ -n "$OLD_RELEASES" ]; then
   echo "$OLD_RELEASES" | while read old_release; do
     [ -z "$old_release" ] && continue
     echo "Deleting old release: $old_release"
-    gh release delete "$old_release" --repo "$GITHUB_REPOSITORY" --yes
+    gh release delete "$old_release" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
   done
   echo "✓ Old releases cleaned up"
 else
