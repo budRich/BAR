@@ -3,7 +3,7 @@
 
 pkgname=xwmplay
 pkgver=0.1.5
-pkgrel=1
+pkgrel=2
 pkgdesc='play with windowmanagers in xephyr, automatic screenresolution'
 arch=('any')
 url='https://github.com/budRich/xwmplay'
