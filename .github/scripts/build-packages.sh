@@ -56,17 +56,17 @@ echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
   
   chown -R builduser:builduser . 
 
-  declare -a makedepends
-  str_depends=$(grep '^makedepends' PKGBUILD)
+  (
+    source PKGBUILD
 
-  if [[ $str_depends ]]; then
-    eval "$str_depends"
-    echo found makedepends: "${makedepends[@]}"
-    pacman --noconfirm -S "${makedepends[@]}"
-    unset 'makedepends[@]'
-  else
-    echo no makedepends needed
-  fi
+    if [[ ${makedepends[*]} ]]; then
+      echo found makedepends: "${makedepends[@]}"
+      pacman --noconfirm -S "${makedepends[@]}"
+    else
+      echo no makedepends needed
+    fi
+  )
+  
   
   # Build the package
   sudo -u builduser makepkg --nodeps --noconfirm
