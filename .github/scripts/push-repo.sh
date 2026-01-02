@@ -1,31 +1,35 @@
 #!/bin/bash
 set -e
 
-# Download all packages from the latest release
+# Get list of newly built package names
+BUILT_PACKAGES=$(cd /tmp/repo && ls *.pkg.tar.zst | sed -E 's/^([^0-9]+)-[0-9].*/\1/' | sort -u)
+echo "Newly built packages: $BUILT_PACKAGES"
+
+# Download all packages from the latest release (except ones we just built)
 echo "Fetching packages from latest release..."
 mkdir -p /tmp/all-packages
 cd /tmp/all-packages
 
-LATEST_RELEASE=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 | cut -f1 || true)
+LATEST_RELEASE=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 | cut -f3 || true)
 
 if [ -n "$LATEST_RELEASE" ]; then
   echo "Downloading packages from release: $LATEST_RELEASE"
+  
+  # Download all package files
   gh release download "$LATEST_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "*.pkg.tar.zst" --pattern "*.pkg.tar.zst.sig" 2>/dev/null || true
+  
+  # Remove packages we just built (we'll copy fresh versions)
+  for pkgname in $BUILT_PACKAGES; do
+    echo "Skipping old versions of $pkgname (we have fresh builds)..."
+    rm -f ${pkgname}-*.pkg.tar.zst*
+  done
 else
   echo "No previous release found, this is the first release"
 fi
 
-# Copy newly built packages and remove old versions
+# Copy newly built packages
 cd /tmp/repo
 for pkg in *.pkg.tar.zst; do
-  # Extract package name without version (e.g., i3ass from i3ass-2025.12.27.1-5-any.pkg.tar.zst)
-  pkgname=$(echo "$pkg" | sed -E 's/^([^0-9]+)-[0-9].*/\1/')
-  
-  # Remove old versions of this package
-  echo "Removing old versions of $pkgname..."
-  rm -f /tmp/all-packages/${pkgname}-*.pkg.tar.zst*
-  
-  # Copy new version
   echo "Adding new version: $pkg"
   cp "$pkg" "$pkg.sig" /tmp/all-packages/
 done
