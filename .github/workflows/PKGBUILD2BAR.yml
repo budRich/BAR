@@ -26,6 +26,8 @@ jobs:
           fetch-depth: 0
 
       - name: Build packages
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/build-packages.sh
 
       - name: Setup GPG for signing
