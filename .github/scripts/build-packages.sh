@@ -61,8 +61,11 @@ echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
 
   if [[ $str_depends ]]; then
     eval "$str_depends"
+    echo found makedepends: "${makedepends[@]}"
     pacman --noconfirm -S "${makedepends[@]}"
     unset 'makedepends[@]'
+  else
+    echo no makedepends needed
   fi
   
   # Build the package
