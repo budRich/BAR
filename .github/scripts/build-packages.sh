@@ -70,20 +70,20 @@ echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
   echo "Building package in $pkg_dir"
   cd "$GITHUB_WORKSPACE/$pkg_dir"
   
-  # Import any GPG keys for source verification
+  # Clean up any lingering faked processes to prevent IPC errors
+  pkill faked || true
+  
+  chown -R builduser:builduser . 
+  
+  # Import any GPG keys for source verification (as builduser)
   if [ -d "keys/pgp" ]; then
     echo "Importing GPG keys for source verification..."
     for keyfile in keys/pgp/*.asc; do
       [ -e "$keyfile" ] || continue
       echo "Importing key: $keyfile"
-      gpg --import "$keyfile"
+      sudo -u builduser gpg --import "$keyfile"
     done
   fi
-  
-  # Clean up any lingering faked processes to prevent IPC errors
-  pkill faked || true
-  
-  chown -R builduser:builduser . 
 
   # (
   #   source PKGBUILD
