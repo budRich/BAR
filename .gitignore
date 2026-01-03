@@ -6,4 +6,5 @@ pkg/*/*
 !pkg/*/*.hook
 !pkg/*/*.install
 !pkg/*/LICENSE*
+!pkg/pidgin-gtkui/keys
 notes.md
