@@ -3,7 +3,26 @@
 
 # Configure git to trust the repository directory
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
+# Initialize pacman keyring
+echo "Initializing pacman keyring..."
+pacman-key --init
+pacman-key --populate archlinux
 
+# Add BAR repository if it exists (for inter-package dependencies)
+LATEST_RELEASE=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 | cut -f3 || true)
+if [ -n "$LATEST_RELEASE" ]; then
+  echo "Adding BAR repository for dependencies..."
+  curl -s https://raw.githubusercontent.com/budRich/BAR/master/public-key.asc | pacman-key --add -
+  pacman-key --lsign-key 03932D58D15CB5F4E5799586E9C940B5E6BE4258
+  
+  echo "" >> /etc/pacman.conf
+  echo "[BAR]" >> /etc/pacman.conf
+  echo "Server = https://github.com/$GITHUB_REPOSITORY/releases/latest/download" >> /etc/pacman.conf
+  echo "SigLevel = Required DatabaseOptional" >> /etc/pacman.conf
+  
+  pacman -Sy
+  echo "✓ BAR repository added"
+fi
 mkdir -p /tmp/arch-packages
 
 # Create a build user once (can't build as root)
