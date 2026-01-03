@@ -25,6 +25,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Add BAR repo
+        run: bash .github/scripts/add-repo.sh
+
       - name: Build packages
         env:
           GH_TOKEN: ${{ github.token }}
