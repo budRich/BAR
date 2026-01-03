@@ -3,6 +3,7 @@ pkg/*/*
 !pkg/*/.SRCINFO
 !pkg/*/PKGBUILD
 !pkg/*/*.patch
+!pkg/*/*.diff
 !pkg/*/*.hook
 !pkg/*/*.install
 !pkg/*/LICENSE*
