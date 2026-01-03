@@ -56,20 +56,20 @@ echo "$CHANGED_PKGBUILDS" | while read pkgbuild; do
   
   chown -R builduser:builduser . 
 
-  (
-    source PKGBUILD
+  # (
+  #   source PKGBUILD
 
-    if [[ ${makedepends[*]} ]]; then
-      echo found makedepends: "${makedepends[@]}"
-      pacman --noconfirm -S "${makedepends[@]}"
-    else
-      echo no makedepends needed
-    fi
-  )
+  #   if [[ ${makedepends[*]} ]]; then
+  #     echo found makedepends: "${makedepends[@]}"
+  #     pacman --noconfirm -S "${makedepends[@]}"
+  #   else
+  #     echo no makedepends needed
+  #   fi
+  # )
   
   
   # Build the package
-  sudo -u builduser makepkg --nodeps --noconfirm
+  sudo -u builduser makepkg -s --noconfirm
   
   # Copy built packages
   cp *.pkg.tar.* /tmp/arch-packages/ || true
