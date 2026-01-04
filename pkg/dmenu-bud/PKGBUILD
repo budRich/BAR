@@ -1,0 +1,37 @@
+# Maintainer: bud
+
+pkgname=dmenu-bud
+pkgver=5.4.0
+_upstream_ver=5.4
+pkgrel=1
+pkgdesc='Generic menu for X. Patched to fit i3menu'
+url='https://github.com/budRich/dmenu'
+arch=('x86_64')
+license=('MIT')
+depends=('sh' 'glibc' 'coreutils' 'libx11' 'libxinerama' 'libxft' 'freetype2' 'fontconfig' 'libfontconfig.so')
+provides=(dmenu)
+conflicts=(dmenu)
+source=(https://dl.suckless.org/tools/dmenu-${_upstream_ver}.tar.gz buds.patch)
+sha512sums=(SKIP SKIP)
+b2sums=(SKIP SKIP)
+prepare() {
+  cd dmenu-${_upstream_ver}
+  patch -p1 -i ../buds.patch
+  echo "CPPFLAGS+=${CPPFLAGS}" >> config.mk
+  echo "CFLAGS+=${CFLAGS}" >> config.mk
+  echo "LDFLAGS+=${LDFLAGS}" >> config.mk
+}
+
+build() {
+  cd dmenu-${_upstream_ver}
+  make \
+    X11INC=/usr/include/X11 \
+    X11LIB=/usr/lib/X11 \
+    FREETYPEINC=/usr/include/freetype2
+}
+
+package() {
+  cd dmenu-${_upstream_ver}
+  make PREFIX=/usr DESTDIR="${pkgdir}" install
+  install -Dm 644 LICENSE -t "${pkgdir}/usr/share/licenses/${pkgname}"
+}
