@@ -1,0 +1,29 @@
+# Maintainer: bud of budlabs
+
+pkgname=gtk-libwinmenu
+pkgver=2026.01.04
+pkgrel=1
+pkgdesc='Hide menu bar in most GTK2 or GTK3 applications'
+arch=(x86_64)
+url='https://github.com/budRich/gtk-libwinmenu'
+license=(0BSD)
+groups=(lxde)
+depends=(
+  gtk2
+  gtk3
+)
+
+source=(
+  "${url}/archive/refs/tags/${pkgver}.tar.gz"
+)
+sha256sums=('SKIP')
+
+build() {
+  cd "${pkgname}-${pkgver}"
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+}
+
+package() {
+  cd "${pkgname}-${pkgver}"
+  make DESTDIR="$pkgdir/" PREFIX=/usr install
+}
