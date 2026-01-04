@@ -1,0 +1,22 @@
+pkgbase = lxtask-bud
+	pkgdesc = Task manager of the LXDE Desktop (budRich fork)
+	pkgver = 0.1.12
+	pkgrel = 1
+	url = https://github.com/lxde/lxtask
+	arch = x86_64
+	groups = lxde
+	license = GPL-2.0-or-later
+	makedepends = intltool
+	depends = glib2
+	depends = glibc
+	depends = gtk2
+	provides = lxtask
+	conflicts = lxtask
+	source = https://github.com/budRich/lxtask/archive/refs/tags/0.1.12.tar.gz
+	source = lxtask.appdata.xml
+	source = lxtask-transient-dialog.patch
+	b2sums = SKIP
+	b2sums = d52df1095650dd326fe794d0c08461c1b4c9c3bf2a31ea7f737596423011d90d12d7f613882a401534d07ed29af02578ae8583813cf7da0b1bc94f8ad45c3879
+	b2sums = 7e61be192df34fb12b3117e2e99562c472e2cdf0e594b4db9bc4dcf3703eacd5740353c4fc8e62943b75097c227bc527b390eed25376e14071fdc3e2aa476225
+
+pkgname = lxtask-bud

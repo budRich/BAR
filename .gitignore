@@ -5,6 +5,7 @@ pkg/*/*
 !pkg/*/*.patch
 !pkg/*/*.diff
 !pkg/*/*.hook
+!pkg/*/*.xml
 !pkg/*/*.install
 !pkg/*/LICENSE*
 !pkg/*/keys
