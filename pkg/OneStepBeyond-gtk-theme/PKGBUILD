@@ -13,7 +13,7 @@ depends=()
 makedepends=('sassc')
 optdepends=()
 source=("$url/archive/$pkgver/${_pkgname}-$pkgver.tar.gz")
-sha256sums=('3adc94fd819459694f843b67ad0b0d0fc69f69c1d669c5ec79c8ca9be45a1dd1')
+sha256sums=('e24dacc4c5818ca05fb0d63b49a715675215f05b592a96beaf9298976eb83aa7')
 
 # https://github.com/budRich/OneStepBeyond/archive/refs/tags/2026.01.05.tar.gz
 
