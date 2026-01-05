@@ -3,7 +3,7 @@
 
 pkgname=OneStepBeyond-gtk-theme
 _pkgname=${pkgname%%-*}
-pkgver=2026.01.05.3
+pkgver=2026.01.05.4
 pkgrel=1
 pkgdesc='Theme for GTK2, GTK3 and GTK4 based on "OneSteBack"'
 arch=('any')
