@@ -1,0 +1,29 @@
+# Maintainer: bud of budlabs
+
+pkgname=pidgin-minimal-conversation-plugin
+pkgver=2026.01.05
+pkgrel=1
+pkgdesc='Thin borders in conversation windows'
+arch=(x86_64)
+url='https://github.com/budRich/pidgin-minimal-conversation-plugin'
+license=(GPL-2.0)
+groups=(blade)
+depends=(
+  gtk2
+  pidgin
+)
+
+source=(
+  "${url}/archive/refs/tags/${pkgver}.tar.gz"
+)
+sha256sums=('7a5a82006b5e5740b4743216e30ffcb7b3f614ceaa5a2aabfed38c8a82e77e77')
+
+build() {
+  cd "${pkgname}-${pkgver}"
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+}
+
+package() {
+  cd "${pkgname}-${pkgver}"
+  make DESTDIR="$pkgdir/" PREFIX=/usr install
+}

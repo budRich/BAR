@@ -1,0 +1,14 @@
+pkgbase = pidgin-minimal-conversation-plugin
+	pkgdesc = Thin borders in conversation windows
+	pkgver = 2026.01.05
+	pkgrel = 1
+	url = https://github.com/budRich/pidgin-minimal-conversation-plugin
+	arch = x86_64
+	groups = blade
+	license = GPL-2.0
+	depends = gtk2
+	depends = pidgin
+	source = https://github.com/budRich/pidgin-minimal-conversation-plugin/archive/refs/tags/2026.01.05.tar.gz
+	sha256sums = 7a5a82006b5e5740b4743216e30ffcb7b3f614ceaa5a2aabfed38c8a82e77e77
+
+pkgname = pidgin-minimal-conversation-plugin
