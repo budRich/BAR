@@ -1,0 +1,12 @@
+pkgbase = OneStepBeyond-gtk-theme
+	pkgdesc = Theme for GTK2, GTK3 and GTK4 based on "OneSteBack"
+	pkgver = 2026.01.05.3
+	pkgrel = 1
+	url = https://github.com/budRich/OneStepBeyond
+	arch = any
+	license = GPL
+	makedepends = sassc
+	source = https://github.com/budRich/OneStepBeyond/archive/2026.01.05.3/OneStepBeyond-2026.01.05.3.tar.gz
+	sha256sums = 3adc94fd819459694f843b67ad0b0d0fc69f69c1d669c5ec79c8ca9be45a1dd1
+
+pkgname = OneStepBeyond-gtk-theme
