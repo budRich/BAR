@@ -1,0 +1,46 @@
+# Maintainer: budlabs
+# """inspired""" by i3-git AUR package
+
+pkgname=i3-bud
+pkgver=4.25.0
+pkgrel=1
+pkgdesc='i3wm with fat borders, desktop support and window controls'
+arch=('i686' 'x86_64')
+url='https://github.com/budRich/i3'
+license=('BSD')
+provides=('i3-wm')
+conflicts=('i3-wm' 'i3-gaps' 'i3-gaps-next-git')
+groups=('i3' 'i3-vcs')
+depends=('libev' 'libxkbcommon-x11' 'pango' 'startup-notification' 'ttf-font'
+         'xcb-util-cursor' 'xcb-util-keysyms' 'xcb-util-wm' 'xcb-util-xrm'
+         'yajl' 'i3ass')
+makedepends=('asciidoc' 'git' 'meson' 'xmlto')
+optdepends=('i3lock: For locking your screen.'
+            'i3status: To display system information with a bar.')
+optdepends=(
+            'dmenu: for the default program launcher'
+            'i3lock: for the default screen locker'
+            'i3status: for the default status bar generator'
+            'perl-anyevent-i3: for i3-save-tree'
+            'perl-json-xs: for i3-save-tree'
+            'perl: for i3-save-tree and i3-dmenu-desktop'
+            'rofi: for a modern dmenu replacement'
+            'xss-lock: for the default screen locker')
+source=("${url}/archive/refs/tags/${pkgver}.zip")
+sha1sums=('b4516a7b2544bd7f7a66369b2eb1b0fa40560759')
+options=('docs')
+
+build() {
+  cd i3-"$pkgver"
+  arch-meson -Dmans=true -Ddocs=true build
+  meson compile -C build
+}
+
+package() {
+  cd i3-"$pkgver"
+  DESTDIR="${pkgdir}" meson install -C build
+
+  install -Dt "${pkgdir}/usr/share/licenses/${pkgname}" -m644 LICENSE
+}
+
+# vim:set ts=2 sw=2 et:
