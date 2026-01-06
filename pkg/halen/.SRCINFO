@@ -1,0 +1,18 @@
+pkgbase = halen
+	pkgdesc = Clipboard Manager for X11
+	pkgver = 0.1
+	pkgrel = 1
+	url = https://github.com/budlabs/halen
+	arch = x86_64
+	license = 0BSD
+	makedepends = pkg-config
+	depends = libx11
+	depends = libxtst
+	depends = libxext
+	depends = libxfixes
+	depends = fontconfig
+	depends = libxft
+	source = https://github.com/budlabs/halen/archive/refs/tags/0.1.tar.gz
+	sha512sums = SKIP
+
+pkgname = halen

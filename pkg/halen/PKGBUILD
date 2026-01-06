@@ -1,0 +1,24 @@
+# Maintainer: bud
+
+pkgname=halen
+pkgver=0.1
+pkgrel=1
+pkgdesc='Clipboard Manager for X11'
+url='https://github.com/budlabs/halen'
+arch=('x86_64')
+license=('0BSD')
+depends=(libx11 libxtst libxext libxfixes fontconfig libxft)
+makedepends=(pkg-config)
+source=("${url}/archive/refs/tags/${pkgver}.tar.gz")
+sha512sums=('6fa6effbde96553c92e1a78e8427e668ce7759626841470e4a2ae161762a9d063d1a76a0b77fcc7e919a48f0624151765939092710c81e4a5e0cb99b25f40f2d')
+
+build() {
+  cd ${pkgname}-${pkgver}
+  make PREFIX=/usr DESTDIR="${pkgdir}"
+}
+
+package() {
+  cd ${pkgname}-${pkgver}
+  make PREFIX=/usr DESTDIR="${pkgdir}" install
+  install -Dm 644 LICENSE -t "${pkgdir}/usr/share/licenses/${pkgname}"
+}
