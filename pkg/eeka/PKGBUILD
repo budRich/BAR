@@ -1,0 +1,23 @@
+# Maintainer: bud
+
+pkgname=eeka
+pkgver=0.1.1
+pkgrel=1
+pkgdesc='Mouse button combinator and remapper'
+url='https://github.com/budlabs/eeka'
+arch=('x86_64')
+license=('0BSD')
+depends=(libxcb xcb-util-keysyms)
+source=("${url}/archive/refs/tags/${pkgver}.tar.gz")
+sha512sums=('c3e7f8fe5c46f85c9d5ec95ae8c0fca5ba7a4a76a015026dd12a5992a3d0582fbcf283c9d4ca4a5d0cf45c8855b90b1a8d0c68ebb8bb594835302a043008c9f5')
+
+build() {
+  cd ${pkgname}-${pkgver}
+  make PREFIX=/usr DESTDIR="${pkgdir}"
+}
+
+package() {
+  cd ${pkgname}-${pkgver}
+  make PREFIX=/usr DESTDIR="${pkgdir}" install
+  install -Dm 644 LICENSE -t "${pkgdir}/usr/share/licenses/${pkgname}"
+}
