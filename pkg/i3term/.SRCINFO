@@ -1,0 +1,20 @@
+pkgbase = i3term
+	pkgdesc = Manage terminals in i3wm assisted by i3ass
+	pkgver = 0.2
+	pkgrel = 1
+	url = https://github.com/budlabs/i3term
+	arch = any
+	license = 0BSD
+	makedepends = gawk
+	depends = bash>=4.0.0
+	depends = dmenu-bud
+	depends = gawk
+	depends = i3ass
+	optdepends = xterm
+	optdepends = rxvt-unicode
+	optdepends = xfce4-terminal
+	optdepends = st
+	source = https://github.com/budlabs/i3term/archive/0.2/i3term-0.2.tar.gz
+	sha256sums = SKIP
+
+pkgname = i3term

@@ -1,0 +1,31 @@
+# Maintainer: bud
+# Contributor: bud
+
+pkgname=i3term
+pkgver=0.2
+pkgrel=1
+pkgdesc='Manage terminals in i3wm assisted by i3ass'
+arch=('any')
+url='https://github.com/budlabs/i3term'
+license=('0BSD')
+depends=('bash>=4.0.0' 'dmenu-bud' 'gawk' 'i3ass')
+makedepends=('gawk')
+optdepends=(xterm rxvt-unicode xfce4-terminal st)
+source=("$url/archive/$pkgver/${pkgname}-$pkgver.tar.gz")
+sha256sums=('SKIP')
+_trgdir="$pkgname-$pkgver"
+
+# _trgdir="$pkgname"
+# sha256sums=('SKIP')
+# url='file:///home/bud/git/lab/i3term'
+# source=("${pkgname}::git+$url")
+
+package() {
+  cd "$_trgdir"
+
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+  make DESTDIR="$pkgdir/" PREFIX=/usr install
+
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+  install -Dm644 -t "$pkgdir/usr/share/doc/$pkgname" README.md
+}
