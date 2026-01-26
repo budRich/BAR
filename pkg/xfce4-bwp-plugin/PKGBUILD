@@ -1,0 +1,39 @@
+# Maintainer: budRich von budlabs
+# Contributor: budRich
+_pkgname=xfce4-bwp-plugin
+pkgname=${_pkgname}-git
+pkgver=r2.39f13e8
+pkgrel=1
+pkgdesc='bwp driven wallpaper plugin for xfce4-panel'
+arch=('any')
+url='https://github.com/budRich/xfce4-bwp-plugin'
+license=('0BSD')
+makedepends=(go gtk3 xfce4-panel)
+depends=(bwp)
+optdepends=()
+conflicts=(${_pkgname})
+source=("${_pkgname}::git+$url")
+provides=(${_pkgname})
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "${_pkgname}"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "${_pkgname}"
+
+  go mod download
+
+  make DESTDIR="$pkgdir/" PREFIX=/usr
+}
+
+package() {
+  cd "${_pkgname}"
+
+  make DESTDIR="$pkgdir/" PREFIX=/usr install
+
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+  install -Dm644 -t "$pkgdir/usr/share/doc/$pkgname" README.md
+}

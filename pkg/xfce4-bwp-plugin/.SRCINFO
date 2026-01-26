@@ -1,0 +1,17 @@
+pkgbase = xfce4-bwp-plugin-git
+	pkgdesc = bwp driven wallpaper plugin for xfce4-panel
+	pkgver = r2.39f13e8
+	pkgrel = 1
+	url = https://github.com/budRich/xfce4-bwp-plugin
+	arch = any
+	license = 0BSD
+	makedepends = go
+	makedepends = gtk3
+	makedepends = xfce4-panel
+	depends = bwp
+	provides = xfce4-bwp-plugin
+	conflicts = xfce4-bwp-plugin
+	source = xfce4-bwp-plugin::git+https://github.com/budRich/xfce4-bwp-plugin
+	sha256sums = SKIP
+
+pkgname = xfce4-bwp-plugin-git
