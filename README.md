@@ -1,3 +1,7 @@
+# MAINTAINED at https://git.budlabs.xyz/bud/BAR
+
+---
+
 # BAR
 Buds Arch Repositories
 
